@@ -1,5 +1,7 @@
 // Функция безопасной инициализации банка
 function initializeBank() {
+    localStorage.clear(); 
+
     let data = localStorage.getItem('homeBankData');
     
     // Если базы данных в браузере вообще нет (первый запуск)
