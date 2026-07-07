@@ -1,15 +1,32 @@
-// Загружаем базу данных. Если хранилище пустое, создаем аккаунт Банкира (Папы)
-let bankAccounts = JSON.parse(localStorage.getItem('homeBankData')) || {
-    "77777777": { owner: "Главный Банкир 👑", balance: 100000, cvv: "8354", formattedNumber: "7777 7777" }
-};
+// Функция безопасной инициализации банка
+function initializeBank() {
+    let data = localStorage.getItem('homeBankData');
+    if (!data) {
+        let bankBase = {};
+        // Маскируем создание админ-счета, чтобы его цифр не было видно в коде
+        // (70000000 + 7777777) = 77777777. Пароль: (8000 + 354) = 8354
+        let adminKey = String(70000000 + 7777777); 
+        let adminCVV = String(8000 + 354);
+        
+        bankBase[adminKey] = {
+            owner: "Главный Банкир 👑",
+            balance: 100000,
+            cvv: adminCVV,
+            formattedNumber: "7777 7777",
+            isAdmin: true // Скрытый флаг администратора
+        };
+        localStorage.setItem('homeBankData', JSON.stringify(bankBase));
+        return bankBase;
+    }
+    return JSON.parse(data);
+}
 
-let myAccountNumber = ""; // Здесь храним "чистый" номер текущего пользователя (без пробелов)
-const ADMIN_NUMBER = "77777777";
+let bankAccounts = initializeBank();
+let myAccountNumber = ""; 
 let html5QrCode = null; 
 
 window.addEventListener('DOMContentLoaded', () => {
     let savedNumber = localStorage.getItem('activeBankSession');
-    // Очищаем на всякий случай от пробелов
     if (savedNumber) {
         savedNumber = savedNumber.replace(/\s+/g, '');
         if (bankAccounts[savedNumber]) {
@@ -32,7 +49,6 @@ function switchZone(zone) {
     if (zone === 'register') {
         document.getElementById('login-zone').style.display = 'none';
         document.getElementById('register-zone').style.display = 'block';
-        
         let rawGenerated = generateAccountNumber();
         document.getElementById('reg-generated-number').innerText = rawGenerated;
     } else {
@@ -51,13 +67,14 @@ function createAccount() {
     if (customCVV.length !== 3 || isNaN(customCVV)) { alert("Ошибка! Детский CVV код должен состоять из 3 цифр!"); return; }
     
     let formatted = document.getElementById('reg-generated-number').innerText;
-    let cleanNumber = formatted.replace(/\s+/g, ''); // Удаляем пробелы для ключа в базе
+    let cleanNumber = formatted.replace(/\s+/g, ''); 
     
     bankAccounts[cleanNumber] = { 
         owner: name, 
         balance: 0, 
         cvv: customCVV,
-        formattedNumber: formatted // Сохраняем красивый вид для отображения
+        formattedNumber: formatted,
+        isAdmin: false
     };
     saveToStorage();
     
@@ -68,18 +85,10 @@ function createAccount() {
 }
 
 function loginAccount() {
-    let numberInput = document.getElementById('login-number').value.trim();
+    let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
     const cvvInput = document.getElementById('login-cvv').value.trim();
     
-    // Очищаем введенный номер от любых пробелов
-    numberInput = numberInput.replace(/\s+/g, '');
-    
     bankAccounts = JSON.parse(localStorage.getItem('homeBankData')) || bankAccounts;
-    
-    if (!bankAccounts[ADMIN_NUMBER]) {
-        bankAccounts[ADMIN_NUMBER] = { owner: "Главный Банкир 👑", balance: 100000, cvv: "8354", formattedNumber: "7777 7777" };
-        saveToStorage();
-    }
 
     if (!bankAccounts[numberInput] || bankAccounts[numberInput].cvv !== cvvInput) {
         alert("Неверные данные для входа!"); return;
@@ -92,7 +101,8 @@ function loginAccount() {
 function autoLogin(accountNumber) {
     myAccountNumber = accountNumber.replace(/\s+/g, '');
     
-    if (myAccountNumber === ADMIN_NUMBER) {
+    // Проверяем админа не по жесткому номеру, а по скрытому флагу безопасности
+    if (bankAccounts[myAccountNumber] && bankAccounts[myAccountNumber].isAdmin === true) {
         document.getElementById('display-name').innerText = bankAccounts[myAccountNumber].owner;
         document.getElementById('admin-tag').style.display = "inline-block";
         document.getElementById('admin-deposit-zone').style.display = "block";
@@ -148,8 +158,6 @@ function generateQRWithAmount() {
     }
     
     qrContainer.innerHTML = "";
-    
-    // Зашиваем чистый номер без пробелов, чтобы сканер не путался
     let qrDataString = `${myAccountNumber}|${amount}`;
     
     new QRCode(qrContainer, {
@@ -166,7 +174,6 @@ function startScanner() {
     readerElement.style.display = "block";
 
     if (html5QrCode) { stopScanner(); }
-
     html5QrCode = new Html5Qrcode("reader");
 
     html5QrCode.start(
@@ -175,10 +182,9 @@ function startScanner() {
         (decodedText) => {
             if (decodedText.includes('|')) {
                 let parts = decodedText.split('|');
-                let scanAccountNumber = parts[0].replace(/\s+/g, ''); // чистим от пробелов получателя
+                let scanAccountNumber = parts[0].replace(/\s+/g, ''); 
                 let scanAmount = parts[1];
                 
-                // Для вывода на экран ставим красивый номер с пробелом, если он есть в базе
                 let visualNumber = bankAccounts[scanAccountNumber] ? bankAccounts[scanAccountNumber].formattedNumber : scanAccountNumber;
                 
                 document.getElementById('target-account-number').value = visualNumber;
@@ -192,13 +198,12 @@ function startScanner() {
                 document.getElementById('transfer-amount').value = "";
                 alert(`Распознан номер счета: ${visualNumber}`);
             }
-            
             stopScanner();
         },
         (errorMessage) => {}
     ).catch((err) => {
         console.error(err);
-        alert("Не удалось запустить камеру. Проверьте разрешения!");
+        alert("Не удалось запустить камеру.");
         readerElement.style.display = "none";
     });
 }
@@ -224,17 +229,14 @@ function addMoney() {
 }
 
 function transferMoney() {
-    let targetNumber = document.getElementById('target-account-number').value.trim();
+    let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('transfer-amount');
     const amount = parseInt(amountInput.value);
-    
-    // Важнейшая очистка: убираем пробелы из номера получателя перед поиском в базе!
-    targetNumber = targetNumber.replace(/\s+/g, '');
     
     bankAccounts = JSON.parse(localStorage.getItem('homeBankData')) || bankAccounts;
     
     if (isNaN(amount) || amount <= 0) { alert("Укажите корректную сумму!"); return; }
-    if (amount > bankAccounts[myAccountNumber].balance) { alert("В казне не хватает монет!"); return; }
+    if (amount > bankAccounts[myAccountNumber].balance) { alert("Не хватает монет!"); return; }
     if (!bankAccounts[targetNumber]) { alert("Счет получателя не найден в базе банка!"); return; }
     if (targetNumber === myAccountNumber) { alert("Нельзя переводить самому себе!"); return; }
     
