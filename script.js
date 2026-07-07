@@ -1,10 +1,11 @@
 // Функция безопасной инициализации банка
 function initializeBank() {
     let data = localStorage.getItem('homeBankData');
+    
+    // Если базы данных в браузере вообще нет (первый запуск)
     if (!data) {
         let bankBase = {};
-        // Маскируем создание админ-счета, чтобы его цифр не было видно в коде
-        // (70000000 + 7777777) = 77777777. Пароль: (8000 + 354) = 8354
+        // Маскируем создание админ-счета: (70000000 + 7777777) = "77777777"
         let adminKey = String(70000000 + 7777777); 
         let adminCVV = String(8000 + 354);
         
@@ -13,12 +14,29 @@ function initializeBank() {
             balance: 100000,
             cvv: adminCVV,
             formattedNumber: "7777 7777",
-            isAdmin: true // Скрытый флаг администратора
+            isAdmin: true 
         };
         localStorage.setItem('homeBankData', JSON.stringify(bankBase));
         return bankBase;
     }
-    return JSON.parse(data);
+    
+    // Если база есть, подтягиваем её
+    let parsedData = JSON.parse(data);
+    
+    // На всякий случай проверяем: если админ случайно стерся из памяти, создаем его заново
+    let adminKey = String(70000000 + 7777777);
+    if (!parsedData[adminKey]) {
+        parsedData[adminKey] = {
+            owner: "Главный Банкир 👑",
+            balance: 100000,
+            cvv: adminCVV = String(8000 + 354),
+            formattedNumber: "7777 7777",
+            isAdmin: true
+        };
+        localStorage.setItem('homeBankData', JSON.stringify(parsedData));
+    }
+    
+    return parsedData;
 }
 
 let bankAccounts = initializeBank();
@@ -85,10 +103,12 @@ function createAccount() {
 }
 
 function loginAccount() {
+    // ВАЖНО: При ручном входе мы очищаем ЛЮБЫЕ пробелы из поля ввода!
     let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
     const cvvInput = document.getElementById('login-cvv').value.trim();
     
-    bankAccounts = JSON.parse(localStorage.getItem('homeBankData')) || bankAccounts;
+    // Перед проверкой обновляем базу данных из памяти браузера
+    bankAccounts = initializeBank();
 
     if (!bankAccounts[numberInput] || bankAccounts[numberInput].cvv !== cvvInput) {
         alert("Неверные данные для входа!"); return;
@@ -101,7 +121,6 @@ function loginAccount() {
 function autoLogin(accountNumber) {
     myAccountNumber = accountNumber.replace(/\s+/g, '');
     
-    // Проверяем админа не по жесткому номеру, а по скрытому флагу безопасности
     if (bankAccounts[myAccountNumber] && bankAccounts[myAccountNumber].isAdmin === true) {
         document.getElementById('display-name').innerText = bankAccounts[myAccountNumber].owner;
         document.getElementById('admin-tag').style.display = "inline-block";
