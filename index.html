@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Эксклюзивный Детский Банк</title>
-    <!-- Подключаем библиотеки для генерации и сканирования QR-кодов -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
@@ -25,7 +24,6 @@
         .account-number { font-family: monospace; background: #f8f9fa; padding: 6px 12px; border-radius: 6px; border: 1px dashed #3498db; color: #2980b9; font-size: 18px; display: inline-block; margin-top: 5px; margin-bottom: 12px; }
         .cvv-number { font-family: monospace; background: #f1c40f; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 16px; }
         .admin-badge { background-color: #9b59b6; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
-        /* Стили для окон QR */
         #qr-container { display: flex; justify-content: center; margin: 15px 0; background: #f8f9fa; padding: 10px; border-radius: 10px; }
         #reader { width: 100%; max-width: 350px; margin: 15px auto; border-radius: 10px; overflow: hidden; }
     </style>
@@ -34,7 +32,6 @@
 
     <h1>✨ HomeBank Premium ✨</h1>
 
-    <!-- 1. ОКНО ВХОДА -->
     <div class="bank-card" id="login-zone">
         <h3>🔐 Войти в личный кабинет</h3>
         <label>Номер счета:</label>
@@ -45,7 +42,6 @@
         <center><button class="btn-link" onclick="switchZone('register')">У меня еще нет счета (Регистрация)</button></center>
     </div>
 
-    <!-- 2. ОКНО РЕГИСТРАЦИИ -->
     <div class="bank-card" id="register-zone" style="display: none;">
         <h3>🚀 Открытие нового счета</h3>
         <label>Ваш будущий номер счета:</label><br>
@@ -59,23 +55,25 @@
         <center><button class="btn-link" onclick="switchZone('login')">Уже есть счет? Войти</button></center>
     </div>
 
-    <!-- 3. ЛИЧНЫЙ КАБИНЕТ -->
     <div class="bank-card" id="account-zone" style="display: none;">
         <h2><span id="display-name">Владелец</span><span id="admin-tag" class="admin-badge" style="display: none;">БАНКИР</span></h2>
         <p>Номер счета: <strong class="account-number" id="display-number">0000 0000</strong></p>
         <p>Ваш секретный CVV: <span class="cvv-number" id="display-cvv">000</span></p>
         <p style="font-size: 28px; margin: 20px 0;">Баланс: <strong id="balance" style="color: #2ecc71;">0</strong> 🪙</p>
         
-        <!-- КНОПКА ДЛЯ ПОКАЗА СВОЕГО QR КОДА -->
-        <button class="btn-purple" onclick="toggleQRCode()">Показать мой QR для перевода 📱</button>
+        <button class="btn-purple" onclick="toggleQRCodeZone()">Запросить перевод по QR-коду 📱</button>
         <div id="qr-block" style="display: none; text-align: center; margin-top: 15px;">
-            <h4>Ваш QR-код:</h4>
-            <div id="qr-container"></div>
+            <label>Какую сумму вы хотите получить?</label>
+            <input type="number" id="qr-requested-amount" placeholder="Количество монет (например, 50)" min="1">
+            <button class="btn-purple" onclick="generateQRWithAmount()">Сгенерировать QR-код ✨</button>
+            <div id="qr-container-wrapper" style="display: none; margin-top: 15px;">
+                <h4>Покажите этот код для оплаты:</h4>
+                <div id="qr-container"></div>
+            </div>
         </div>
 
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         
-        <!-- Блок пополнения (Папа) -->
         <div id="admin-deposit-zone" style="display: none;">
             <h4>🎁 Выдать монеты за задание</h4>
             <input type="number" id="deposit-amount" placeholder="Количество монет" min="1">
@@ -83,10 +81,8 @@
             <br><br><hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         </div>
 
-        <!-- Перевод по номеру счета -->
         <h4 id="transfer-title">💸 Перевод на другой счет</h4>
         
-        <!-- КНОПКА ДЛЯ СКАНИРОВАНИЯ ЧУЖОГО QR -->
         <button class="btn-alt" id="scan-btn" onclick="startScanner()">Сканировать QR-код получателя 📷</button>
         <div id="reader" style="display: none;"></div>
         
