@@ -2,24 +2,112 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Эксклюзивный Детский Банк</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eef2f7; padding: 20px; color: #333; }
-        .bank-card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 420px; margin: 0 auto 20px auto; }
-        h1 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
+        /* Стили, адаптированные под мобильные экраны */
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #eef2f7; 
+            padding: 15px; 
+            color: #333; 
+            margin: 0;
+        }
+        h1 { 
+            text-align: center; 
+            color: #2c3e50; 
+            margin: 20px 0;
+            font-size: 24px; /* Чуть меньше для мобильных */
+        }
         h3, h4 { margin-top: 0; color: #34495e; }
-        button { background-color: #2ecc71; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.2s; }
+        
+        /* Карточка теперь занимает 100% ширины экрана на телефоне, но не больше 420px */
+        .bank-card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05); 
+            max-width: 420px; 
+            margin: 0 auto 20px auto; 
+            box-sizing: border-box; /* Чтобы отступы не ломали ширину */
+        }
+        
+        /* Кнопки стали крупнее — так удобнее нажимать пальцем */
+        button { 
+            background-color: #2ecc71; 
+            color: white; 
+            border: none; 
+            padding: 14px 20px; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            width: 100%; 
+            margin-top: 10px; 
+            font-size: 16px;
+            transition: 0.2s; 
+            -webkit-tap-highlight-color: transparent; /* Убирает синюю вспышку при тапе на смартфонах */
+        }
         button:hover { background-color: #27ae60; }
         .btn-alt { background-color: #3498db; }
         .btn-alt:hover { background-color: #2980b9; }
         .btn-danger { background-color: #e74c3c; }
         .btn-danger:hover { background-color: #c0392b; }
-        .btn-link { background: none; color: #3498db; border: none; padding: 0; width: auto; font-weight: normal; text-decoration: underline; margin-top: 15px; }
-        .btn-link:hover { color: #2980b9; }
-        input { padding: 10px; width: calc(100% - 22px); border-radius: 8px; border: 1px solid #ccc; margin-top: 8px; margin-bottom: 12px; font-size: 14px; }
-        .account-number { font-family: monospace; background: #f8f9fa; padding: 5px 10px; border-radius: 4px; border: 1px dashed #3498db; color: #2980b9; font-size: 16px; display: inline-block; margin-top: 5px; margin-bottom: 12px; }
-        .cvv-number { font-family: monospace; background: #f1c40f; padding: 3px 8px; border-radius: 4px; color: #fff; font-weight: bold; }
-        .admin-badge { background-color: #9b59b6; color: white; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-left: 5px; }
+        
+        .btn-link { 
+            background: none; 
+            color: #3498db; 
+            border: none; 
+            padding: 5px; 
+            width: auto; 
+            font-weight: normal; 
+            text-decoration: underline; 
+            margin-top: 15px; 
+            font-size: 14px;
+        }
+        
+        /* Крупные инпуты для ввода данных */
+        input { 
+            padding: 12px; 
+            width: 100%; 
+            border-radius: 10px; 
+            border: 1px solid #ccc; 
+            margin-top: 8px; 
+            margin-bottom: 15px; 
+            font-size: 16px; /* 16px предотвращает автоматический зум экрана в iOS при фокусе */
+            box-sizing: border-box;
+        }
+        
+        .account-number { 
+            font-family: monospace; 
+            background: #f8f9fa; 
+            padding: 6px 12px; 
+            border-radius: 6px; 
+            border: 1px dashed #3498db; 
+            color: #2980b9; 
+            font-size: 18px; 
+            display: inline-block; 
+            margin-top: 5px; 
+            margin-bottom: 12px; 
+        }
+        .cvv-number { 
+            font-family: monospace; 
+            background: #f1c40f; 
+            padding: 4px 10px; 
+            border-radius: 6px; 
+            color: #fff; 
+            font-weight: bold; 
+            font-size: 16px;
+        }
+        .admin-badge { 
+            background-color: #9b59b6; 
+            color: white; 
+            padding: 4px 8px; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            font-weight: bold; 
+            margin-left: 8px; 
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
@@ -49,7 +137,7 @@
         <label>Придумайте свой CVV код (3 цифры):</label>
         <input type="text" id="reg-custom-cvv" placeholder="Например, 777" maxlength="3">
         
-        <button onclick="createAccount()">Зарегистрироваться и создать счет</button>
+        <button onclick="createAccount()">Зарегистрироваться</button>
         <center><button class="btn-link" onclick="switchZone('login')">Уже есть счет? Войти</button></center>
     </div>
 
@@ -57,14 +145,14 @@
         <h2><span id="display-name">Владелец</span><span id="admin-tag" class="admin-badge" style="display: none;">БАНКИР</span></h2>
         <p>Номер счета: <strong class="account-number" id="display-number">0000 0000</strong></p>
         <p>Ваш секретный CVV: <span class="cvv-number" id="display-cvv">000</span></p>
-        <p style="font-size: 26px; margin: 15px 0;">Баланс: <strong id="balance" style="color: #2ecc71;">0</strong> 🪙</p>
+        <p style="font-size: 28px; margin: 20px 0;">Баланс: <strong id="balance" style="color: #2ecc71;">0</strong> 🪙</p>
         
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         
         <div id="admin-deposit-zone" style="display: none;">
-            <h4>🎁 Выдать монеты за задание (Печать новых денег)</h4>
+            <h4>🎁 Выдать монеты за задание</h4>
             <input type="number" id="deposit-amount" placeholder="Количество монет" min="1">
-            <button class="btn-alt" onclick="addMoney()">Напечатать монеты и внести на свой баланс ➕</button>
+            <button class="btn-alt" onclick="addMoney()">Напечатать монеты ➕</button>
             <br><br><hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         </div>
 
