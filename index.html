@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HomeBank Business Premium</title>
-    <!-- Официальные стабильные библиотеки для QR -->
+    <title>HomeBank Central</title>
+    <!-- Подключаем стабильный сканер на случай, если системы безопасности пропустят камеру -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f3f4f6; padding: 15px; color: #111827; margin: 0; }
+        body { font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f3f4f6; padding: 15px; color: #111827; margin: 0; }
         h1 { text-align: center; color: #1f2937; margin: 20px 0; font-size: 22px; font-weight: 700; }
         h3, h4 { margin-top: 0; color: #374151; font-weight: 600; }
         .bank-card { background: white; padding: 24px; border-radius: 20px; box-shadow: 0 4px 18px rgba(0,0,0,0.03); max-width: 440px; margin: 0 auto 20px auto; box-sizing: border-box; }
@@ -19,15 +19,19 @@
         .btn-dark:hover { background-color: #111827; }
         .btn-danger { background-color: #ef4444; }
         .btn-danger:hover { background-color: #dc2626; }
+        .btn-purple { background-color: #8b5cf6; }
+        .btn-purple:hover { background-color: #7c3aed; }
         .btn-link { background: none; color: #3b82f6; border: none; padding: 5px; width: auto; font-weight: 500; text-decoration: none; margin-top: 15px; font-size: 14px; }
         input { padding: 14px; width: 100%; border-radius: 12px; border: 1px solid #d1d5db; margin-top: 8px; margin-bottom: 16px; font-size: 16px; box-sizing: border-box; background-color: #f9fafb; }
         input:focus { border-color: #3b82f6; outline: none; background-color: #fff; }
         .account-number { font-family: monospace; background: #f3f4f6; padding: 8px 14px; border-radius: 8px; color: #1e3a8a; font-size: 18px; display: inline-block; margin-top: 5px; margin-bottom: 12px; font-weight: 600; letter-spacing: 1px; }
         .cvv-number { font-family: monospace; background: #f59e0b; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 15px; }
-        #reader { width: 100%; max-width: 360px; margin: 15px auto; border-radius: 14px; overflow: hidden; display: none; border: 2px solid #e5e7eb; }
+        
+        /* Стили для QR и Чеков */
         .qr-wrapper { display: none; text-align: center; margin-top: 15px; padding: 15px; background: #f9fafb; border-radius: 12px; border: 1px dashed #ced4da; }
         .qr-img { margin-top: 10px; border: 6px solid white; box-shadow: 0 4px 14px rgba(0,0,0,0.08); border-radius: 10px; max-width: 200px; width: 100%; }
         .balance-text { font-size: 32px; margin: 15px 0; font-weight: 700; color: #10b981; }
+        #reader { width: 100%; max-width: 350px; margin: 15px auto; border-radius: 14px; overflow: hidden; display: none; border: 2px solid #e5e7eb; }
     </style>
 </head>
 <body>
@@ -70,32 +74,35 @@
             <div class="balance-text"><span id="balance">0.00</span> 🪙</div>
         </div>
 
-        <!-- КЛАССИЧЕСКИЙ СБП И QR-ОПЛАТА -->
-        <div style="background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0;">
-            <h4>QR-код и Система Быстрых Платежей</h4>
+        <!-- СИСТЕМА БЫСТРЫХ ПЛАТЕЖЕЙ (QR-КОД) -->
+        <div style="background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <h4>🖼️ Оплата и выставление счетов по QR</h4>
             
-            <!-- Генерация требования оплаты -->
             <label>Сумма к получению (Выставить счет):</label>
             <input type="number" id="qr-requested-amount" placeholder="0.00" min="1">
-            <button class="btn-alt" onclick="generateInvoiceQR()">1. Создать QR на оплату 📱</button>
+            <button class="btn-alt" onclick="generateInvoiceQR()">Сгенерировать QR-код на оплату 📱</button>
             
-            <!-- Окно отображения QR -->
+            <!-- Контейнер вывода QR -->
             <div class="qr-wrapper" id="invoice-qr-wrapper">
-                <p style="color: #4b5563; font-size: 13px; margin: 0;">Покупатель должен отсканировать этот код:</p>
+                <p style="color: #4b5563; font-size: 13px; margin: 0;">Сканируйте для автоматического перевода:</p>
                 <img id="invoice-qr-image" class="qr-img" src="" alt="QR">
             </div>
 
-            <div style="margin-top: 15px;">
-                <button class="btn-dark" onclick="startScanner('PAYMENT')">2. Сканировать и оплатить QR 📷</button>
-                <button class="btn-purple" style="background-color:#8b5cf6;" onclick="startScanner('CONFIRM')">3. Подтвердить получение денег 🏁</button>
-            </div>
-            
+            <!-- Встроенный сканер -->
+            <button class="btn-purple" style="margin-top: 15px;" onclick="startMobileScanner()">Включить сканер камеры 📷</button>
             <div id="reader"></div>
         </div>
 
-        <!-- КЛАССИЧЕСКИЙ ПЕРЕВОД ПО НОМЕРУ -->
-        <div style="margin-top: 25px;">
-            <h4>💸 Прямой перевод по номеру счета</h4>
+        <!-- РУЧНОЙ ВВОД ДАННЫХ ИЗ QR (ЕСЛИ КАМЕРА ЗАКРЫТА СИСТЕМОЙ) -->
+        <div style="background: #fdf2f8; padding: 15px; border-radius: 14px; border: 1px solid #fbcfe8; margin-bottom: 20px;">
+            <h4>⌨️ Альтернативный ввод (Если камера не работает)</h4>
+            <input type="text" id="coupon-code-input" placeholder="Вставьте текст из QR-кода (INV-...)">
+            <button class="btn-purple" onclick="redeemManualQR()">Подтвердить оплату кодом 💸</button>
+        </div>
+
+        <!-- КЛАССИЧЕСКИЙ ПЕРЕВОД ПО НОМЕРУ СЧЕТА -->
+        <div style="background: white; padding: 5px; border-radius: 14px;">
+            <h4>💸 Прямой перевод по реквизитам</h4>
             <input type="text" id="target-account-number" placeholder="Номер счета получателя (XXXX XXXX)">
             <input type="number" id="transfer-amount" placeholder="Сумма перевода">
             <button class="btn-danger" onclick="transferMoney()">Отправить перевод ➡️</button>

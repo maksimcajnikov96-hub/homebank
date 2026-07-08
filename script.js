@@ -1,17 +1,12 @@
-// Функция полной и надежной инициализации банка
 function initializeBank() {
     let data = localStorage.getItem('homeBankData');
     let bankBase = {};
     
     if (data) {
-        try { 
-            bankBase = JSON.parse(data); 
-        } catch (e) { 
-            bankBase = {}; 
-        }
+        try { bankBase = JSON.parse(data); } catch (e) { bankBase = {}; }
     }
     
-    // 1. КЛЮЧ АДМИНИСТРАТОРА / КАЗНЫ
+    // Главный расчетный счет (Управление банка)
     let adminKey = "77777777";
     if (!bankBase[adminKey] || bankBase[adminKey].cvv !== "8354") {
         bankBase[adminKey] = {
@@ -22,7 +17,7 @@ function initializeBank() {
         };
     }
     
-    // 2. ПОЛЬЗОВАТЕЛЬСКИЙ СЧЕТ ПО УМОЛЧАНИЮ
+    // Второй системный расчетный счет по умолчанию
     let childKey = "21535477";
     if (!bankBase[childKey] || bankBase[childKey].cvv !== "111") {
         bankBase[childKey] = {
@@ -39,13 +34,10 @@ function initializeBank() {
 
 let bankAccounts = initializeBank();
 let myAccountNumber = ""; 
-let html5QrCode = null; 
+let html5QrCode = null;
 
-// Проверка автосохранения сессии при загрузке страницы
 window.addEventListener('DOMContentLoaded', () => {
-    // Принудительно обновляем базу при загрузке
     bankAccounts = initializeBank();
-    
     let savedNumber = localStorage.getItem('activeBankSession');
     if (savedNumber) {
         savedNumber = savedNumber.replace(/\s+/g, '');
@@ -93,28 +85,19 @@ function createAccount() {
     };
     saveToStorage();
     
-    alert(`🎉 Счет успешно открыт!\nНомер: ${formatted}\nCVV: ${cvvInput}\nВам начислен стартовый баланс 500 монет.`);
+    alert(`🎉 Счет успешно открыт!\nНомер: ${formatted}\nCVV: ${cvvInput}`);
     switchZone('login');
     document.getElementById('login-number').value = formatted;
     document.getElementById('login-cvv').value = cvvInput;
 }
 
-// УСИЛЕННАЯ ФУНКЦИЯ ВХОДА
 function loginAccount() {
     let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
     const cvvInput = document.getElementById('login-cvv').value.trim();
-    
-    // Перед проверкой всегда считываем актуальные данные
     bankAccounts = initializeBank();
 
-    if (!bankAccounts[numberInput]) {
-        alert("Ошибка! Расчетный счет не найден в системе."); 
-        return;
-    }
-    
-    if (bankAccounts[numberInput].cvv !== cvvInput) {
-        alert("Ошибка! Неверный CVV код безопасности."); 
-        return;
+    if (!bankAccounts[numberInput] || bankAccounts[numberInput].cvv !== cvvInput) {
+        alert("Ошибка авторизации!"); return;
     }
     
     localStorage.setItem('activeBankSession', numberInput);
@@ -124,8 +107,6 @@ function loginAccount() {
 
 function autoLogin(accountNumber) {
     let user = bankAccounts[accountNumber];
-    if (!user) return;
-    
     document.getElementById('display-name').innerText = user.owner;
     document.getElementById('display-number').innerText = user.formattedNumber || accountNumber;
     document.getElementById('display-cvv').innerText = user.cvv;
@@ -140,23 +121,59 @@ function logout() {
     myAccountNumber = "";
     document.getElementById('account-zone').style.display = "none";
     document.getElementById('login-zone').style.display = "block";
-    document.getElementById('login-number').value = "";
-    document.getElementById('login-cvv').value = "";
 }
 
+// ГЕНЕРАЦИЯ QR СЧЕТА К ПОЛУЧЕНИЮ ДЕНЕГ
 function generateInvoiceQR() {
     const amountInput = document.getElementById('qr-requested-amount');
     const amount = parseInt(amountInput.value);
     if (isNaN(amount) || amount <= 0) { alert("Укажите корректную сумму счета!"); return; }
     
-    let qrDataString = encodeURIComponent(`INV|${myAccountNumber}|${amount}`);
+    // Формируем чистую строку для шифрования в QR
+    let rawTextData = `INV-${myAccountNumber}-${amount}`;
+    let qrDataString = encodeURIComponent(rawTextData);
+    
     let qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${qrDataString}`;
     
     document.getElementById('invoice-qr-image').src = qrApiUrl;
     document.getElementById('invoice-qr-wrapper').style.display = "block";
 }
 
-function startScanner(mode) {
+// ОБРАБОТКА ДАННЫХ ИЗ QR (Списание и зачисление монет)
+function processQRData(textString) {
+    if (!textString.startsWith("INV-")) {
+        alert("Неверный формат платежного кода!"); return false;
+    }
+    
+    let parts = textString.split("-");
+    if (parts.length !== 3) {
+        alert("Ошибка! Платёжная строка повреждена."); return false;
+    }
+    
+    let vendorAccount = parts[1];
+    let amount = parseInt(parts[2]);
+    
+    bankAccounts = initializeBank();
+    if (amount > bankAccounts[myAccountNumber].balance) {
+        alert("Недостаточно средств для проведения транзакции!"); return false;
+    }
+    if (vendorAccount === myAccountNumber) {
+        alert("Нельзя оплачивать счет самому себе!"); return false;
+    }
+    
+    // Перерасчёт
+    bankAccounts[myAccountNumber].balance -= amount;
+    bankAccounts[vendorAccount].balance += amount;
+    
+    saveToStorage();
+    updateUI();
+    
+    alert(`💰 Оплата успешно проведена!\nСписано: ${amount} монет.\nПолучатель: ${bankAccounts[vendorAccount].owner}`);
+    return true;
+}
+
+// РЕЖИМ А: СКАНИРОВАНИЕ КАМЕРОЙ
+function startMobileScanner() {
     const readerElement = document.getElementById('reader');
     readerElement.style.display = "block";
     
@@ -164,90 +181,48 @@ function startScanner(mode) {
     html5QrCode = new Html5Qrcode("reader");
 
     html5QrCode.start(
-        { facingMode: "environment" }, { fps: 10, qrbox: 260 },
+        { facingMode: "environment" }, { fps: 10, qrbox: 250 },
         (decodedText) => {
             let data = decodeURIComponent(decodedText);
-            
-            if (mode === 'PAYMENT' && data.startsWith('INV|')) {
-                let parts = data.split('|');
-                let vendorAccount = parts[1];
-                let amount = parseInt(parts[2]);
-                
-                bankAccounts = initializeBank();
-                if (bankAccounts[myAccountNumber].balance < amount) {
-                    alert("Ошибка! Недостаточно средств для оплаты данного счета.");
-                    stopScanner(); return;
-                }
-                
-                bankAccounts[myAccountNumber].balance -= amount;
-                saveToStorage(); updateUI();
-                
-                let salt = Math.floor(1000 + Math.random() * 9000);
-                let checkStr = encodeURIComponent(`SUCCESS|${vendorAccount}|${amount}|${salt}`);
-                
-                document.getElementById('invoice-qr-image').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${checkStr}`;
-                document.getElementById('invoice-qr-wrapper').style.display = "block";
-                
-                alert(`💰 Деньги списаны! На вашем экране создан чек успешной оплаты.\n\nПокажите ваш экран Продавцу, чтобы он подтвердил получение монет!`);
-                stopScanner();
-            }
-            else if (mode === 'CONFIRM' && data.startsWith('SUCCESS|')) {
-                let parts = data.split('|');
-                let vendorAccount = parts[1];
-                let amount = parseInt(parts[2]);
-                let salt = parts[3];
-                
-                if (vendorAccount !== myAccountNumber) {
-                    alert("Ошибка! Данный чек выписан для другого расчетного счета.");
-                    stopScanner(); return;
-                }
-                
-                let usedReceipts = JSON.parse(localStorage.getItem('usedHomeBankReceipts') || "[]");
-                if (usedReceipts.includes(salt)) {
-                    alert("Этот платежный чек уже был активирован ранее!");
-                    stopScanner(); return;
-                }
-                
-                bankAccounts = initializeBank();
-                bankAccounts[myAccountNumber].balance += amount;
-                saveToStorage(); updateUI();
-                
-                usedReceipts.push(salt);
-                localStorage.setItem('usedHomeBankReceipts', JSON.stringify(usedReceipts));
-                
-                alert(`🎉 Оплата принята! На ваш счет успешно зачислено ${amount} монет!`);
-                stopScanner();
-            } else {
-                alert("Ошибка! Неверный или неподдерживаемый тип QR-кода.");
-                stopScanner();
+            let success = processQRData(data);
+            if (success) {
+                html5QrCode.stop().then(() => { readerElement.style.display = "none"; });
             }
         }, (err) => {}
-    ).catch(() => { alert("Камера недоступна. Откройте сайт в обычном Safari или Chrome и дайте разрешение."); readerElement.style.display = "none"; });
+    ).catch((err) => {
+        alert("Камера заблокирована системой браузера. Используйте ручной ввод текстового кода из QR!");
+        readerElement.style.display = "none";
+    });
 }
 
-function stopScanner() {
-    if (html5QrCode) {
-        html5QrCode.stop().then(() => { document.getElementById('reader').style.display = "none"; });
+// РЕЖИМ Б: АЛЬТЕРНАТИВНЫЙ РУЧНОЙ ВВОД ТЕКСТА ИЗ QR
+function redeemManualQR() {
+    let inputField = document.getElementById('coupon-code-input');
+    let code = inputField.value.trim();
+    let success = processQRData(code);
+    if (success) {
+        inputField.value = "";
     }
 }
 
+// ОБЫЧНЫЙ ПЕРЕВОД ПО СЧЕТУ
 function transferMoney() {
     let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('transfer-amount');
     const amount = parseInt(amountInput.value);
     
     bankAccounts = initializeBank();
-    if (isNaN(amount) || amount <= 0) { alert("Укажите корректную сумму!"); return; }
-    if (!bankAccounts[targetNumber]) { alert("Счет получателя не зарегистрирован в системе!"); return; }
-    if (amount > bankAccounts[myAccountNumber].balance) { alert("Недостаточно средств на балансе!"); return; }
-    if (targetNumber === myAccountNumber) { alert("Нельзя совершать переводы самому себе!"); return; }
+    if (isNaN(amount) || amount <= 0) { alert("Укажите сумму!"); return; }
+    if (!bankAccounts[targetNumber]) { alert("Получатель не найден!"); return; }
+    if (amount > bankAccounts[myAccountNumber].balance) { alert("Недостаточно средств!"); return; }
+    if (targetNumber === myAccountNumber) { alert("Нельзя переводить себе!"); return; }
     
     bankAccounts[myAccountNumber].balance -= amount;
     bankAccounts[targetNumber].balance += amount;
     
     saveToStorage(); updateUI();
     amountInput.value = ""; document.getElementById('target-account-number').value = "";
-    alert(`🎉 Перевод ${amount} монет успешно отправлен пользователю ${bankAccounts[targetNumber].owner}!`);
+    alert(`🎉 Перевод ${amount} монет выполнен успешно!`);
 }
 
 function updateUI() {
