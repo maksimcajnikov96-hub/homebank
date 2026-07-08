@@ -1,61 +1,83 @@
-function initializeBank() {
-    let data = localStorage.getItem('homeBankData');
-    let bankBase = {};
-    
-    if (data) {
-        try { bankBase = JSON.parse(data); } catch (e) { bankBase = {}; }
-    }
-    
-    // Главный расчетный счет (Управление банка)
-    let adminKey = "77777777";
-    if (!bankBase[adminKey] || bankBase[adminKey].cvv !== "8354") {
-        bankBase[adminKey] = {
-            owner: "Управление Банка (Казна) 👑",
-            balance: 500000,
-            cvv: "8354",
-            formattedNumber: "7777 7777"
-        };
-    }
-    
-    // Второй системный расчетный счет по умолчанию
-    let childKey = "21535477";
-    if (!bankBase[childKey] || bankBase[childKey].cvv !== "111") {
-        bankBase[childKey] = {
-            owner: "Центральный расчетный счет", 
-            balance: 1000,      
-            cvv: "111",        
-            formattedNumber: "2153 5477"
-        };
-    }
-    
-    localStorage.setItem('homeBankData', JSON.stringify(bankBase));
-    return bankBase;
+const CLOUD_API_URL = "https://api.jsonbin.io/v3/b/66184a7eacd3cb34a83696fb"; 
+
+function getDefaultData() {
+    return {
+        accounts: {
+            "77777777": { owner: "Управление Банка (Казна) 👑", balance: 500000, cvv: "8354", formattedNumber: "7777 7777" },
+            "21535477": { owner: "Центральный расчетный счет", balance: 1000, cvv: "111", formattedNumber: "2153 5477" }
+        },
+        logs: []
+    };
 }
 
-let bankAccounts = initializeBank();
+let bankDatabase = getDefaultData();
 let myAccountNumber = ""; 
-let html5QrCode = null;
 
-window.addEventListener('DOMContentLoaded', () => {
-    bankAccounts = initializeBank();
+// Загрузка общей базы из облака (для всех устройств)
+async function loadBankData() {
+    let localData = localStorage.getItem('homeBankGlobalData');
+    if (localData) {
+        bankDatabase = JSON.parse(localData);
+    }
+    
+    try {
+        const response = await fetch(CLOUD_API_URL + "/latest", {
+            method: "GET",
+            headers: { "X-Master-Key": "$2b$10$P1W7p2S4v9zG1u.vA7vTeO6HwNf02Bq2V3sW9Xh7h1gXJ9yB7k8D6" }
+        });
+        if (response.ok) {
+            let resData = await response.json();
+            if (resData.record && resData.record.accounts) {
+                bankDatabase = resData.record;
+                localStorage.setItem('homeBankGlobalData', JSON.stringify(bankDatabase));
+            }
+        }
+    } catch (e) { console.log("Автономный режим"); }
+    
+    if (!bankDatabase.accounts["77777777"]) bankDatabase.accounts["77777777"] = getDefaultData().accounts["77777777"];
+    if (!bankDatabase.accounts["21535477"]) bankDatabase.accounts["21535477"] = getDefaultData().accounts["21535477"];
+}
+
+// Сохранение общей базы в облако (чтобы увидели другие телефоны)
+async function saveBankData() {
+    localStorage.setItem('homeBankGlobalData', JSON.stringify(bankDatabase));
+    try {
+        await fetch(CLOUD_API_URL, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Master-Key": "$2b$10$P1W7p2S4v9zG1u.vA7vTeO6HwNf02Bq2V3sW9Xh7h1gXJ9yB7k8D6"
+            },
+            body: JSON.stringify(bankDatabase)
+        });
+    } catch (e) { console.log("Ошибка сети"); }
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+    await loadBankData();
+    
     let savedNumber = localStorage.getItem('activeBankSession');
     if (savedNumber) {
         savedNumber = savedNumber.replace(/\s+/g, '');
-        if (bankAccounts[savedNumber]) {
+        if (bankDatabase.accounts[savedNumber]) {
             myAccountNumber = savedNumber;
             autoLogin(savedNumber);
         }
     }
+    
+    // Постоянное автообновление истории и балансов каждые 3 секунды
+    setInterval(async () => {
+        if (myAccountNumber !== "") {
+            await loadBankData();
+            updateUI();
+        }
+    }, 3000);
 });
 
 function generateAccountNumber() {
     let part1 = Math.floor(1000 + Math.random() * 9000);
     let part2 = Math.floor(1000 + Math.random() * 9000);
     return `${part1} ${part2}`;
-}
-
-function saveToStorage() {
-    localStorage.setItem('homeBankData', JSON.stringify(bankAccounts));
 }
 
 function switchZone(zone) {
@@ -69,35 +91,38 @@ function switchZone(zone) {
     }
 }
 
-function createAccount() {
+async function createAccount() {
     const nameInput = document.getElementById('reg-name').value.trim();
     const cvvInput = document.getElementById('reg-custom-cvv').value.trim();
     
-    if (nameInput === "") { alert("Введите ФИО владельца!"); return; }
-    if (cvvInput.length < 3 || isNaN(cvvInput)) { alert("CVV должен содержать от 3 до 4 цифр!"); return; }
+    if (nameInput === "") { alert("Введите ФИО!"); return; }
+    if (cvvInput.length < 3 || isNaN(cvvInput)) { alert("CVV должен быть из цифр!"); return; }
     
     let formatted = document.getElementById('reg-generated-number').innerText;
     let cleanNumber = formatted.replace(/\s+/g, ''); 
     
-    bankAccounts = initializeBank();
-    bankAccounts[cleanNumber] = { 
+    await loadBankData();
+    bankDatabase.accounts[cleanNumber] = { 
         owner: nameInput, balance: 500, cvv: cvvInput, formattedNumber: formatted
     };
-    saveToStorage();
     
-    alert(`🎉 Счет успешно открыт!\nНомер: ${formatted}\nCVV: ${cvvInput}`);
+    addTransactionToLog("SYS", "00000000", cleanNumber, 500, "Регистрация счета");
+    await saveBankData();
+    
+    alert(`🎉 Счет открыт: ${formatted}`);
     switchZone('login');
     document.getElementById('login-number').value = formatted;
     document.getElementById('login-cvv').value = cvvInput;
 }
 
-function loginAccount() {
+async function loginAccount() {
     let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
     const cvvInput = document.getElementById('login-cvv').value.trim();
-    bankAccounts = initializeBank();
+    
+    await loadBankData();
 
-    if (!bankAccounts[numberInput] || bankAccounts[numberInput].cvv !== cvvInput) {
-        alert("Ошибка авторизации!"); return;
+    if (!bankDatabase.accounts[numberInput] || bankDatabase.accounts[numberInput].cvv !== cvvInput) {
+        alert("Неверные данные!"); return;
     }
     
     localStorage.setItem('activeBankSession', numberInput);
@@ -106,13 +131,19 @@ function loginAccount() {
 }
 
 function autoLogin(accountNumber) {
-    let user = bankAccounts[accountNumber];
+    let user = bankDatabase.accounts[accountNumber];
     document.getElementById('display-name').innerText = user.owner;
     document.getElementById('display-number').innerText = user.formattedNumber || accountNumber;
     document.getElementById('display-cvv').innerText = user.cvv;
     document.getElementById('login-zone').style.display = "none";
     document.getElementById('account-zone').style.display = "block";
-    document.getElementById('invoice-qr-wrapper').style.display = "none";
+    document.getElementById('generated-chek-box').style.display = "none";
+    
+    if (myAccountNumber === "77777777") {
+        document.getElementById('history-title').innerText = "📋 Глобальный аудит транзакций (Казна)";
+    } else {
+        document.getElementById('history-title').innerText = "📋 История ваших операций";
+    }
     updateUI();
 }
 
@@ -123,110 +154,143 @@ function logout() {
     document.getElementById('login-zone').style.display = "block";
 }
 
-// ГЕНЕРАЦИЯ QR СЧЕТА К ПОЛУЧЕНИЮ ДЕНЕГ
-function generateInvoiceQR() {
-    const amountInput = document.getElementById('qr-requested-amount');
-    const amount = parseInt(amountInput.value);
-    if (isNaN(amount) || amount <= 0) { alert("Укажите корректную сумму счета!"); return; }
-    
-    // Формируем чистую строку для шифрования в QR
-    let rawTextData = `INV-${myAccountNumber}-${amount}`;
-    let qrDataString = encodeURIComponent(rawTextData);
-    
-    let qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${qrDataString}`;
-    
-    document.getElementById('invoice-qr-image').src = qrApiUrl;
-    document.getElementById('invoice-qr-wrapper').style.display = "block";
-}
-
-// ОБРАБОТКА ДАННЫХ ИЗ QR (Списание и зачисление монет)
-function processQRData(textString) {
-    if (!textString.startsWith("INV-")) {
-        alert("Неверный формат платежного кода!"); return false;
-    }
-    
-    let parts = textString.split("-");
-    if (parts.length !== 3) {
-        alert("Ошибка! Платёжная строка повреждена."); return false;
-    }
-    
-    let vendorAccount = parts[1];
-    let amount = parseInt(parts[2]);
-    
-    bankAccounts = initializeBank();
-    if (amount > bankAccounts[myAccountNumber].balance) {
-        alert("Недостаточно средств для проведения транзакции!"); return false;
-    }
-    if (vendorAccount === myAccountNumber) {
-        alert("Нельзя оплачивать счет самому себе!"); return false;
-    }
-    
-    // Перерасчёт
-    bankAccounts[myAccountNumber].balance -= amount;
-    bankAccounts[vendorAccount].balance += amount;
-    
-    saveToStorage();
-    updateUI();
-    
-    alert(`💰 Оплата успешно проведена!\nСписано: ${amount} монет.\nПолучатель: ${bankAccounts[vendorAccount].owner}`);
-    return true;
-}
-
-// РЕЖИМ А: СКАНИРОВАНИЕ КАМЕРОЙ
-function startMobileScanner() {
-    const readerElement = document.getElementById('reader');
-    readerElement.style.display = "block";
-    
-    if (html5QrCode) { html5QrCode.clear(); }
-    html5QrCode = new Html5Qrcode("reader");
-
-    html5QrCode.start(
-        { facingMode: "environment" }, { fps: 10, qrbox: 250 },
-        (decodedText) => {
-            let data = decodeURIComponent(decodedText);
-            let success = processQRData(data);
-            if (success) {
-                html5QrCode.stop().then(() => { readerElement.style.display = "none"; });
-            }
-        }, (err) => {}
-    ).catch((err) => {
-        alert("Камера заблокирована системой браузера. Используйте ручной ввод текстового кода из QR!");
-        readerElement.style.display = "none";
-    });
-}
-
-// РЕЖИМ Б: АЛЬТЕРНАТИВНЫЙ РУЧНОЙ ВВОД ТЕКСТА ИЗ QR
-function redeemManualQR() {
-    let inputField = document.getElementById('coupon-code-input');
-    let code = inputField.value.trim();
-    let success = processQRData(code);
-    if (success) {
-        inputField.value = "";
-    }
-}
-
-// ОБЫЧНЫЙ ПЕРЕВОД ПО СЧЕТУ
-function transferMoney() {
+// СОЗДАНИЕ ПЕРЕВОДА (ЛОГ СРАЗУ УЛЕТАЕТ В ОБЛАКО)
+async function transferMoney() {
     let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('transfer-amount');
     const amount = parseInt(amountInput.value);
     
-    bankAccounts = initializeBank();
+    await loadBankData(); 
+    
     if (isNaN(amount) || amount <= 0) { alert("Укажите сумму!"); return; }
-    if (!bankAccounts[targetNumber]) { alert("Получатель не найден!"); return; }
-    if (amount > bankAccounts[myAccountNumber].balance) { alert("Недостаточно средств!"); return; }
+    if (!bankDatabase.accounts[targetNumber]) { alert("Счет не найден!"); return; }
+    if (amount > bankDatabase.accounts[myAccountNumber].balance) { alert("Недостаточно средств!"); return; }
     if (targetNumber === myAccountNumber) { alert("Нельзя переводить себе!"); return; }
     
-    bankAccounts[myAccountNumber].balance -= amount;
-    bankAccounts[targetNumber].balance += amount;
+    // Списываем баланс
+    bankDatabase.accounts[myAccountNumber].balance -= amount;
     
-    saveToStorage(); updateUI();
+    let txId = Math.floor(1000 + Math.random() * 9000);
+    let secureToken = `TX-${txId}-${myAccountNumber}-${targetNumber}-${amount}`;
+    
+    // ВАЖНО: сначала добавляем в массив логов общей базы
+    addTransactionToLog(txId, myAccountNumber, targetNumber, amount, "Чек выпущен (Ожидание)");
+    
+    // ВАЖНО: сразу отправляем всё в интернет, чтобы лог по ID увидели другие телефоны!
+    await saveBankData(); 
+    updateUI();
+    
+    document.getElementById('chek-text-code').innerText = secureToken;
+    document.getElementById('generated-chek-box').style.display = "block";
+    
     amountInput.value = ""; document.getElementById('target-account-number').value = "";
-    alert(`🎉 Перевод ${amount} монет выполнен успешно!`);
+    alert(`🎉 Код создан! Транзакция #${txId} зафиксирована в облаке Гитхаба.`);
+}
+
+// АКТИВАЦИЯ КОДА С ОБНОВЛЕНИЕМ СТАТУСА В ОБЛАКЕ
+async function redeemSecureCode() {
+    let inputField = document.getElementById('coupon-code-input');
+    let token = inputField.value.trim();
+    
+    if (!token.startsWith("TX-")) { alert("Неверный формат кода!"); return; }
+    
+    let parts = token.split("-");
+    if (parts.length !== 5) { alert("Код поврежден!"); return; }
+    
+    let txId = parts[1];
+    let senderAccount = parts[2];
+    let receiverAccount = parts[3];
+    let amount = parseInt(parts[4]);
+    
+    await loadBankData();
+
+    if (receiverAccount !== myAccountNumber) {
+        alert("🔒 Ошибка! Этот код предназначен для другого расчетного счета!");
+        return;
+    }
+    
+    let activatedTokens = JSON.parse(localStorage.getItem('usedHomeBankTokens') || "[]");
+    if (activatedTokens.includes(txId)) {
+        alert("Этот код уже активирован!"); return;
+    }
+    
+    // Начисляем монеты получателю
+    bankDatabase.accounts[myAccountNumber].balance += amount;
+    
+    // Находим транзакцию в общей базе интернета и меняем её статус
+    if (bankDatabase.logs) {
+        let currentLog = bankDatabase.logs.find(l => l.txId === txId.toString());
+        if (currentLog) {
+            currentLog.status = "Успешно зачислено";
+        } else {
+            addTransactionToLog(txId, senderAccount, myAccountNumber, amount, "Успешно зачислено");
+        }
+    }
+    
+    activatedTokens.push(txId);
+    localStorage.setItem('usedHomeBankTokens', JSON.stringify(activatedTokens));
+    
+    // Синхронизируем изменения с облаком
+    await saveBankData();
+    inputField.value = "";
+    updateUI();
+    
+    alert(`💰 Деньги успешно получены (+${amount} 🪙)!`);
+}
+
+function addTransactionToLog(txId, fromUser, toUser, amount, statusDescription) {
+    if (!bankDatabase.logs) bankDatabase.logs = [];
+    let timestamp = new Date().toLocaleTimeString();
+    
+    let logItem = {
+        txId: txId.toString(),
+        from: fromUser,
+        to: toUser,
+        amount: amount,
+        status: statusDescription,
+        time: timestamp
+    };
+    
+    bankDatabase.logs.unshift(logItem);
 }
 
 function updateUI() {
-    if (bankAccounts[myAccountNumber]) {
-        document.getElementById('balance').innerText = bankAccounts[myAccountNumber].balance.toFixed(2);
+    if (bankDatabase.accounts[myAccountNumber]) {
+        document.getElementById('balance').innerText = bankDatabase.accounts[myAccountNumber].balance.toFixed(2);
+    }
+    
+    let container = document.getElementById('history-list-container');
+    if (!container) return;
+    container.innerHTML = "";
+    
+    let searchQuery = document.getElementById('search-tx-id').value.trim();
+    let hasLogs = false;
+    let logs = bankDatabase.logs || [];
+    
+    logs.forEach(log => {
+        if (myAccountNumber === "77777777" || log.from === myAccountNumber || log.to === myAccountNumber) {
+            // Если в поле поиска введен ID, скрываем всё, что под него не подходит
+            if (searchQuery !== "" && !log.txId.includes(searchQuery)) {
+                return; 
+            }
+            
+            hasLogs = true;
+            let item = document.createElement('div');
+            item.className = "history-item";
+            
+            let nameFrom = bankDatabase.accounts[log.from] ? bankDatabase.accounts[log.from].owner : log.from;
+            let nameTo = bankDatabase.accounts[log.to] ? bankDatabase.accounts[log.to].owner : log.to;
+            
+            item.innerHTML = `
+                [${log.time}] <span class="tx-id">Транзакция: #${log.txId}</span><br>
+                Отправитель: <b>${nameFrom}</b> -> Получатель: <b>${nameTo}</b><br>
+                Сумма: <b style="color:#10b981;">${log.amount} 🪙</b> | Статус: <i>${log.status}</i>
+            `;
+            container.appendChild(item);
+        }
+    });
+    
+    if (!hasLogs) {
+        container.innerHTML = "<p style='color:#7f8c8d; font-size:13px; margin:5px 0;'>Транзакции не найдены.</p>";
     }
 }

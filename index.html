@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeBank Central</title>
-    <!-- Подключаем стабильный сканер на случай, если системы безопасности пропустят камеру -->
-    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f3f4f6; padding: 15px; color: #111827; margin: 0; }
         h1 { text-align: center; color: #1f2937; margin: 20px 0; font-size: 22px; font-weight: 700; }
@@ -26,19 +24,21 @@
         input:focus { border-color: #3b82f6; outline: none; background-color: #fff; }
         .account-number { font-family: monospace; background: #f3f4f6; padding: 8px 14px; border-radius: 8px; color: #1e3a8a; font-size: 18px; display: inline-block; margin-top: 5px; margin-bottom: 12px; font-weight: 600; letter-spacing: 1px; }
         .cvv-number { font-family: monospace; background: #f59e0b; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 15px; }
-        
-        /* Стили для QR и Чеков */
-        .qr-wrapper { display: none; text-align: center; margin-top: 15px; padding: 15px; background: #f9fafb; border-radius: 12px; border: 1px dashed #ced4da; }
-        .qr-img { margin-top: 10px; border: 6px solid white; box-shadow: 0 4px 14px rgba(0,0,0,0.08); border-radius: 10px; max-width: 200px; width: 100%; }
         .balance-text { font-size: 32px; margin: 15px 0; font-weight: 700; color: #10b981; }
-        #reader { width: 100%; max-width: 350px; margin: 15px auto; border-radius: 14px; overflow: hidden; display: none; border: 2px solid #e5e7eb; }
+        
+        .chek-box { background: #fff8db; border: 2px dashed #f1c40f; padding: 15px; border-radius: 12px; margin-top: 15px; text-align: center; display: none; }
+        .history-wrapper { margin-top: 25px; background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0; }
+        .history-list { max-height: 220px; overflow-y: auto; margin-top: 10px; padding-right: 5px; }
+        .history-item { font-size: 13px; padding: 10px; border-bottom: 1px solid #e2e8f0; color: #4b5563; line-height: 1.4; }
+        .history-item:last-child { border-bottom: none; }
+        .tx-id { font-family: monospace; color: #3b82f6; font-weight: bold; }
+        .search-input { padding: 10px 14px; margin-bottom: 10px; font-size: 14px; border-radius: 8px; }
     </style>
 </head>
 <body>
 
     <h1>🏦 HomeBank Central</h1>
 
-    <!-- 1. ОКНО ВХОДА -->
     <div class="bank-card" id="login-zone">
         <h3>🔐 Авторизация в системе</h3>
         <label>Номер счета:</label>
@@ -49,7 +49,6 @@
         <center><button class="btn-link" onclick="switchZone('register')">Создать новый расчетный счет</button></center>
     </div>
 
-    <!-- 2. ОКНО РЕГИСТРАЦИИ -->
     <div class="bank-card" id="register-zone" style="display: none;">
         <h3>🚀 Открытие расчетного счета</h3>
         <label>Ваш номер счета:</label><br>
@@ -63,7 +62,6 @@
         <center><button class="btn-link" onclick="switchZone('login')">Вернуться к авторизации</button></center>
     </div>
 
-    <!-- 3. ЛИЧНЫЙ КАБИНЕТ -->
     <div class="bank-card" id="account-zone" style="display: none;">
         <h3><span id="display-name">Владелец счета</span></h3>
         <p style="margin-bottom:8px;">Счет: <strong class="account-number" id="display-number">0000 0000</strong></p>
@@ -74,38 +72,28 @@
             <div class="balance-text"><span id="balance">0.00</span> 🪙</div>
         </div>
 
-        <!-- СИСТЕМА БЫСТРЫХ ПЛАТЕЖЕЙ (QR-КОД) -->
-        <div style="background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
-            <h4>🖼️ Оплата и выставление счетов по QR</h4>
-            
-            <label>Сумма к получению (Выставить счет):</label>
-            <input type="number" id="qr-requested-amount" placeholder="0.00" min="1">
-            <button class="btn-alt" onclick="generateInvoiceQR()">Сгенерировать QR-код на оплату 📱</button>
-            
-            <!-- Контейнер вывода QR -->
-            <div class="qr-wrapper" id="invoice-qr-wrapper">
-                <p style="color: #4b5563; font-size: 13px; margin: 0;">Сканируйте для автоматического перевода:</p>
-                <img id="invoice-qr-image" class="qr-img" src="" alt="QR">
-            </div>
-
-            <!-- Встроенный сканер -->
-            <button class="btn-purple" style="margin-top: 15px;" onclick="startMobileScanner()">Включить сканер камеры 📷</button>
-            <div id="reader"></div>
-        </div>
-
-        <!-- РУЧНОЙ ВВОД ДАННЫХ ИЗ QR (ЕСЛИ КАМЕРА ЗАКРЫТА СИСТЕМОЙ) -->
         <div style="background: #fdf2f8; padding: 15px; border-radius: 14px; border: 1px solid #fbcfe8; margin-bottom: 20px;">
-            <h4>⌨️ Альтернативный ввод (Если камера не работает)</h4>
-            <input type="text" id="coupon-code-input" placeholder="Вставьте текст из QR-кода (INV-...)">
-            <button class="btn-purple" onclick="redeemManualQR()">Подтвердить оплату кодом 💸</button>
+            <h4>💰 Активировать код пополнения</h4>
+            <input type="text" id="coupon-code-input" placeholder="Вставьте полученный код чека (TX-...)">
+            <button class="btn-purple" onclick="redeemSecureCode()">Активировать код перевода 💸</button>
         </div>
 
-        <!-- КЛАССИЧЕСКИЙ ПЕРЕВОД ПО НОМЕРУ СЧЕТА -->
-        <div style="background: white; padding: 5px; border-radius: 14px;">
-            <h4>💸 Прямой перевод по реквизитам</h4>
+        <div style="background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <h4>💸 Прямой перевод средств</h4>
             <input type="text" id="target-account-number" placeholder="Номер счета получателя (XXXX XXXX)">
             <input type="number" id="transfer-amount" placeholder="Сумма перевода">
-            <button class="btn-danger" onclick="transferMoney()">Отправить перевод ➡️</button>
+            <button class="btn-danger" onclick="transferMoney()">Совершить перевод и создать код ➡️</button>
+            
+            <div class="chek-box" id="generated-chek-box">
+                <p style="margin: 0 0 5px 0; font-size: 14px; color: #7f8c8d;">Передайте этот код получателю для зачисления:</p>
+                <strong style="font-size: 15px; color: #d35400; font-family: monospace; display: block; word-break: break-all;" id="chek-text-code">КОД</strong>
+            </div>
+        </div>
+
+        <div class="history-wrapper">
+            <h4 id="history-title">📋 История операций</h4>
+            <input type="text" id="search-tx-id" class="search-input" placeholder="🔍 Поиск по коду (ID) транзакции..." oninput="updateUI()">
+            <div class="history-list" id="history-list-container"></div>
         </div>
         
         <br>
