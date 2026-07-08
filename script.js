@@ -1,17 +1,11 @@
-// Функция полной и надежной инициализации банка
 function initializeBank() {
     let data = localStorage.getItem('homeBankData');
     let bankBase = {};
     
     if (data) {
-        try {
-            bankBase = JSON.parse(data);
-        } catch (e) {
-            bankBase = {};
-        }
+        try { bankBase = JSON.parse(data); } catch (e) { bankBase = {}; }
     }
     
-    // 1. КЛЮЧ АДМИНИСТРАТОРА (Папы)
     let adminKey = "77777777";
     if (!bankBase[adminKey]) {
         bankBase[adminKey] = {
@@ -23,7 +17,6 @@ function initializeBank() {
         };
     }
     
-    // 2. ЖЕЛЕЗНЫЙ КЛЮЧ ДЛЯ ДОЧКИ "21535477"
     let childKey = "21535477";
     if (!bankBase[childKey]) {
         bankBase[childKey] = {
@@ -35,7 +28,6 @@ function initializeBank() {
         };
     }
     
-    // Всегда сохраняем структуру, чтобы гарантировать её наличие
     localStorage.setItem('homeBankData', JSON.stringify(bankBase));
     return bankBase;
 }
@@ -44,7 +36,6 @@ let bankAccounts = initializeBank();
 let myAccountNumber = ""; 
 let html5QrCode = null; 
 
-// Проверка автосохранения сессии при загрузке страницы
 window.addEventListener('DOMContentLoaded', () => {
     let savedNumber = localStorage.getItem('activeBankSession');
     if (savedNumber) {
@@ -56,7 +47,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Добавление кнопок синхронизации, если их нет
     if (document.getElementById('account-zone')) {
         let syncDiv = document.getElementById('sync-zone-wrapper');
         if (!syncDiv) {
@@ -68,7 +58,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 <button class="btn-purple" onclick="exportBankDatabase()">Показать QR синхронизации 🔄</button>
                 <button class="btn-alt" onclick="startSyncScanner()">Сканировать QR синхронизации 📷</button>
                 <div id="sync-qr-wrapper" style="display:none; text-align:center; margin-top:15px;">
-                    <div id="sync-qr-container" style="display:flex; justify-content:center; padding:10px; background:#fff; border-radius:10px;"></div>
+                    <img id="sync-qr-image" style="margin-top:10px; border:4px solid white; box-shadow:0 4px 12px rgba(0,0,0,0.1); border-radius:10px; max-width:220px; width:100%;" src="" alt="QR синхронизации">
                 </div>
             `;
             document.getElementById('account-zone').appendChild(syncDiv);
@@ -98,7 +88,6 @@ function switchZone(zone) {
     }
 }
 
-// ИСПРАВЛЕННАЯ РЕГИСТРАЦИЯ
 function createAccount() {
     const nameInput = document.getElementById('reg-name');
     const cvvInput = document.getElementById('reg-custom-cvv');
@@ -111,36 +100,22 @@ function createAccount() {
     let formatted = document.getElementById('reg-generated-number').innerText;
     let cleanNumber = formatted.replace(/\s+/g, ''); 
     
-    // Сначала подгружаем актуальную базу, чтобы не затереть других пользователей
     bankAccounts = initializeBank();
-    
     bankAccounts[cleanNumber] = { 
-        owner: name, 
-        balance: 0, 
-        cvv: customCVV,
-        formattedNumber: formatted,
-        isAdmin: false
+        owner: name, balance: 0, cvv: customCVV, formattedNumber: formatted, isAdmin: false
     };
-    
-    // Сохраняем жестко в localStorage
     saveToStorage();
     
-    alert(`🎉 Счет успешно создан!\nНомер счета: ${formatted}\nCVV: ${customCVV}`);
-    
-    // Переключаем зону и подставляем данные для входа автоматически
+    alert(`🎉 Счет успешно создан!\nНомер счета: ${formatted}`);
     switchZone('login');
     document.getElementById('login-number').value = formatted;
     document.getElementById('login-cvv').value = customCVV;
-    
     nameInput.value = ""; cvvInput.value = "";
 }
 
-// ИСПРАВЛЕННЫЙ ВХОД
 function loginAccount() {
     let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
     const cvvInput = document.getElementById('login-cvv').value.trim();
-    
-    // Подтягиваем базу с устройства, включая только что созданный аккаунт
     bankAccounts = initializeBank();
 
     if (numberInput === "77777777" && cvvInput === "8354") {
@@ -149,13 +124,8 @@ function loginAccount() {
         return;
     }
 
-    if (!bankAccounts[numberInput]) {
-        alert("Пользователь с таким номером счета не найден! Перепроверьте номер."); 
-        return;
-    }
-    if (bankAccounts[numberInput].cvv !== cvvInput) {
-        alert("Неверный CVV код безопасности!"); 
-        return;
+    if (!bankAccounts[numberInput] || bankAccounts[numberInput].cvv !== cvvInput) {
+        alert("Неверные данные для входа!"); return;
     }
     
     localStorage.setItem('activeBankSession', numberInput);
@@ -164,6 +134,7 @@ function loginAccount() {
 
 function autoLoginAdmin() {
     myAccountNumber = "77777777";
+    bankAccounts = initializeBank();
     document.getElementById('display-name').innerText = "Главный Банкир 👑";
     document.getElementById('admin-tag').style.display = "inline-block";
     document.getElementById('admin-deposit-zone').style.display = "block";
@@ -174,8 +145,8 @@ function autoLoginAdmin() {
     document.getElementById('login-zone').style.display = "none";
     document.getElementById('account-zone').style.display = "block";
     
-    let adminData = localStorage.getItem('admin_balance') || "100000";
-    document.getElementById('balance').innerText = adminData;
+    document.getElementById('qr-request-zone').style.display = "none";
+    updateUI();
 }
 
 function autoLogin(accountNumber) {
@@ -192,6 +163,9 @@ function autoLogin(accountNumber) {
     document.getElementById('login-zone').style.display = "none";
     document.getElementById('account-zone').style.display = "block";
     
+    document.getElementById('qr-request-zone').style.display = "block";
+    document.getElementById('qr-container-wrapper').style.display = "none";
+    
     updateUI();
 }
 
@@ -201,26 +175,22 @@ function logout() {
     myAccountNumber = "";
     document.getElementById('account-zone').style.display = "none";
     document.getElementById('login-zone').style.display = "block";
-    document.getElementById('login-number').value = "";
-    document.getElementById('login-cvv').value = "";
 }
 
-function toggleQRCodeZone() {
-    let qrBlock = document.getElementById('qr-block');
-    qrBlock.style.display = qrBlock.style.display === "none" ? "block" : "none";
-}
-
+// НАДЁЖНАЯ ГЕНЕРАЦИЯ КАРТИНКИ QR-КОДА ЧЕРЕЗ GOOGLE / QRSERVER API
 function generateQRWithAmount() {
     const amountInput = document.getElementById('qr-requested-amount');
     const amount = parseInt(amountInput.value);
-    let qrContainer = document.getElementById('qr-container');
     
-    if (isNaN(amount) || amount <= 0) { alert("Введите корректную сумму!"); return; }
+    if (isNaN(amount) || amount <= 0) { alert("Введите корректную сумму монет!"); return; }
     
-    qrContainer.innerHTML = "";
-    let qrDataString = `${myAccountNumber}|${amount}`;
+    let qrDataString = encodeURIComponent(`${myAccountNumber}|${amount}`);
     
-    new QRCode(qrContainer, { text: qrDataString, width: 180, height: 180 });
+    // Генерируем ссылку на картинку QR-кода
+    let qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrDataString}`;
+    
+    // Подставляем ссылку прямо в картинку на экране
+    document.getElementById('qr-image').src = qrApiUrl;
     document.getElementById('qr-container-wrapper').style.display = "block";
 }
 
@@ -234,7 +204,6 @@ function startScanner() {
         { facingMode: "environment" }, { fps: 10, qrbox: 250 },
         (decodedText) => {
             if (decodedText.startsWith('SYNC|')) { stopScanner(); return; }
-            
             bankAccounts = initializeBank();
             if (decodedText.includes('|')) {
                 let parts = decodedText.split('|');
@@ -262,12 +231,9 @@ function addMoney() {
     const amountInput = document.getElementById('deposit-amount');
     const amount = parseInt(amountInput.value);
     if (isNaN(amount) || amount <= 0) { alert("Введите сумму!"); return; }
-    
-    let currentAdminBalance = parseInt(localStorage.getItem('admin_balance') || "100000");
-    currentAdminBalance += amount;
-    localStorage.setItem('admin_balance', String(currentAdminBalance));
-    document.getElementById('balance').innerText = currentAdminBalance;
-    amountInput.value = "";
+    bankAccounts = initializeBank();
+    bankAccounts[myAccountNumber].balance += amount;
+    saveToStorage(); updateUI(); amountInput.value = "";
 }
 
 function transferMoney() {
@@ -276,39 +242,27 @@ function transferMoney() {
     const amount = parseInt(amountInput.value);
     
     bankAccounts = initializeBank();
-    if (isNaN(amount) || amount <= 0) { alert("Укажите сумму!"); return; }
+    if (isNaN(amount) || amount <= 0) { alert("Укажите сумму перевода!"); return; }
+    if (!bankAccounts[targetNumber]) { alert("Счет получателя не найден!"); return; }
+    if (amount > bankAccounts[myAccountNumber].balance) { alert("Недостаточно монет!"); return; }
+    if (targetNumber === myAccountNumber) { alert("Нельзя переводить себе!"); return; }
     
-    if (myAccountNumber === "77777777") {
-        let currentAdminBalance = parseInt(localStorage.getItem('admin_balance') || "100000");
-        if (amount > currentAdminBalance) { alert("Не хватает монет в казне!"); return; }
-        if (!bankAccounts[targetNumber]) { alert("Счет получателя не найден!"); return; }
-        
-        currentAdminBalance -= amount;
-        localStorage.setItem('admin_balance', String(currentAdminBalance));
-        document.getElementById('balance').innerText = currentAdminBalance;
-    } else {
-        if (amount > bankAccounts[myAccountNumber].balance) { alert("Не хватает монет!"); return; }
-        if (!bankAccounts[targetNumber]) { alert("Счет получателя не найден!"); return; }
-        if (targetNumber === myAccountNumber) { alert("Нельзя переводить себе!"); return; }
-        bankAccounts[myAccountNumber].balance -= amount;
-    }
-    
+    bankAccounts[myAccountNumber].balance -= amount;
     bankAccounts[targetNumber].balance += amount;
-    saveToStorage(); 
-    if (myAccountNumber !== "77777777") { updateUI(); }
+    saveToStorage(); updateUI();
     
     amountInput.value = ""; document.getElementById('target-account-number').value = "";
-    alert(`Успешно переведено ${amount} монет! 🎉 Если играете с разных телефонов, используйте QR синхронизации внизу страницы!`);
+    alert(`Успешно переведено ${amount} монет! 🎉 Если вы играете на разных телефонах, обновите базу через QR синхронизации.`);
 }
 
+// СИНХРОНИЗАЦИЯ ЧЕРЕЗ КАРТИНКУ QR
 function exportBankDatabase() {
-    let qrContainer = document.getElementById('sync-qr-container');
-    let wrapper = document.getElementById('sync-qr-wrapper');
-    qrContainer.innerHTML = "";
-    let dataStr = "SYNC|" + localStorage.getItem('homeBankData');
-    new QRCode(qrContainer, { text: dataStr, width: 250, height: 250 });
-    wrapper.style.display = "block";
-    alert("Отсканируйте этот код с другого телефона для переноса данных!");
+    let dataStr = encodeURIComponent("SYNC|" + localStorage.getItem('homeBankData'));
+    let qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${dataStr}`;
+    
+    document.getElementById('sync-qr-image').src = qrApiUrl;
+    document.getElementById('sync-qr-wrapper').style.display = "block";
+    alert("Отсканируйте этот код со второго телефона для полной синхронизации!");
 }
 
 function startSyncScanner() {
@@ -326,16 +280,14 @@ function startSyncScanner() {
                 bankAccounts = JSON.parse(rawData);
                 alert("🎉 Синхронизация успешна!");
                 location.reload();
-            } else {
-                alert("Это не код синхронизации базы!");
-            }
+            } else { alert("Ошибка кода синхронизации."); }
             stopScanner();
         }, (err) => {}
     ).catch((err) => { alert("Камера недоступна."); });
 }
 
 function updateUI() {
-    if (myAccountNumber !== "77777777" && bankAccounts[myAccountNumber]) {
+    if (bankAccounts[myAccountNumber]) {
         document.getElementById('balance').innerText = bankAccounts[myAccountNumber].balance;
     }
 }

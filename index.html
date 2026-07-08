@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Эксклюзивный Детский Банк</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eef2f7; padding: 15px; color: #333; margin: 0; }
@@ -24,7 +23,9 @@
         .account-number { font-family: monospace; background: #f8f9fa; padding: 6px 12px; border-radius: 6px; border: 1px dashed #3498db; color: #2980b9; font-size: 18px; display: inline-block; margin-top: 5px; margin-bottom: 12px; }
         .cvv-number { font-family: monospace; background: #f1c40f; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 16px; }
         .admin-badge { background-color: #9b59b6; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
-        #qr-container { display: flex; justify-content: center; margin: 15px 0; background: #f8f9fa; padding: 10px; border-radius: 10px; }
+        
+        #qr-container-wrapper { display: none; text-align: center; margin-top: 15px; }
+        #qr-image { margin-top: 10px; border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 10px; max-width: 200px; width: 100%; }
         #reader { width: 100%; max-width: 350px; margin: 15px auto; border-radius: 10px; overflow: hidden; }
     </style>
 </head>
@@ -61,14 +62,15 @@
         <p>Ваш секретный CVV: <span class="cvv-number" id="display-cvv">000</span></p>
         <p style="font-size: 28px; margin: 20px 0;">Баланс: <strong id="balance" style="color: #2ecc71;">0</strong> 🪙</p>
         
-        <button class="btn-purple" onclick="toggleQRCodeZone()">Запросить перевод по QR-коду 📱</button>
-        <div id="qr-block" style="display: none; text-align: center; margin-top: 15px;">
+        <div id="qr-request-zone">
+            <h4>Запросить перевод по QR-коду 📱</h4>
             <label>Какую сумму вы хотите получить?</label>
-            <input type="number" id="qr-requested-amount" placeholder="Количество монет" min="1">
-            <button class="btn-purple" onclick="generateQRWithAmount()">Сгенерировать QR-код ✨</button>
-            <div id="qr-container-wrapper" style="display: none; margin-top: 15px;">
-                <h4>Покажите этот код для оплаты:</h4>
-                <div id="qr-container"></div>
+            <input type="number" id="qr-requested-amount" placeholder="Введите количество монет" min="1">
+            <button class="btn-purple" onclick="generateQRWithAmount()">Показать мой QR-код ✨</button>
+            
+            <div id="qr-container-wrapper" id="qr-wrapper">
+                <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 5px;">Покажите этот код для сканирования:</p>
+                <img id="qr-image" src="" alt="QR Код">
             </div>
         </div>
 
