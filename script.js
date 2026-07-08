@@ -1,8 +1,17 @@
 // Функция полной и надежной инициализации банка
 function initializeBank() {
     let data = localStorage.getItem('homeBankData');
-    let bankBase = data ? JSON.parse(data) : {};
+    let bankBase = {};
     
+    if (data) {
+        try {
+            bankBase = JSON.parse(data);
+        } catch (e) {
+            bankBase = {};
+        }
+    }
+    
+    // 1. КЛЮЧ АДМИНИСТРАТОРА (Папы)
     let adminKey = "77777777";
     if (!bankBase[adminKey]) {
         bankBase[adminKey] = {
@@ -14,6 +23,7 @@ function initializeBank() {
         };
     }
     
+    // 2. ЖЕЛЕЗНЫЙ КЛЮЧ ДЛЯ ДОЧКИ "21535477"
     let childKey = "21535477";
     if (!bankBase[childKey]) {
         bankBase[childKey] = {
@@ -25,6 +35,7 @@ function initializeBank() {
         };
     }
     
+    // Всегда сохраняем структуру, чтобы гарантировать её наличие
     localStorage.setItem('homeBankData', JSON.stringify(bankBase));
     return bankBase;
 }
@@ -33,6 +44,7 @@ let bankAccounts = initializeBank();
 let myAccountNumber = ""; 
 let html5QrCode = null; 
 
+// Проверка автосохранения сессии при загрузке страницы
 window.addEventListener('DOMContentLoaded', () => {
     let savedNumber = localStorage.getItem('activeBankSession');
     if (savedNumber) {
@@ -44,19 +56,23 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Добавим кнопку синхронизации в интерфейс, если её там нет
+    // Добавление кнопок синхронизации, если их нет
     if (document.getElementById('account-zone')) {
-        let syncDiv = document.createElement('div');
-        syncDiv.innerHTML = `
-            <br><hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-            <h4>Облако: Синхронизация между телефонами</h4>
-            <button class="btn-purple" onclick="exportBankDatabase()">Показать QR синхронизации 🔄</button>
-            <button class="btn-alt" onclick="startSyncScanner()">Сканировать QR синхронизации 📷</button>
-            <div id="sync-qr-wrapper" style="display:none; text-align:center; margin-top:15px;">
-                <div id="sync-qr-container" style="display:flex; justify-content:center; padding:10px; background:#fff; border-radius:10px;"></div>
-            </div>
-        `;
-        document.getElementById('account-zone').appendChild(syncDiv);
+        let syncDiv = document.getElementById('sync-zone-wrapper');
+        if (!syncDiv) {
+            syncDiv = document.createElement('div');
+            syncDiv.id = 'sync-zone-wrapper';
+            syncDiv.innerHTML = `
+                <br><hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+                <h4>Облако: Синхронизация между телефонами</h4>
+                <button class="btn-purple" onclick="exportBankDatabase()">Показать QR синхронизации 🔄</button>
+                <button class="btn-alt" onclick="startSyncScanner()">Сканировать QR синхронизации 📷</button>
+                <div id="sync-qr-wrapper" style="display:none; text-align:center; margin-top:15px;">
+                    <div id="sync-qr-container" style="display:flex; justify-content:center; padding:10px; background:#fff; border-radius:10px;"></div>
+                </div>
+            `;
+            document.getElementById('account-zone').appendChild(syncDiv);
+        }
     }
 });
 
@@ -64,43 +80,6 @@ function generateAccountNumber() {
     let part1 = Math.floor(1000 + Math.random() * 9000);
     let part2 = Math.floor(1000 + Math.random() * 9000);
     return `${part1} ${part2}`;
-}
-
-// Функции экспорта/импорта базы через QR для работы на РАЗНЫХ телефонах
-function exportBankDatabase() {
-    let qrContainer = document.getElementById('sync-qr-container');
-    let wrapper = document.getElementById('sync-qr-wrapper');
-    qrContainer.innerHTML = "";
-    
-    let dataStr = "SYNC|" + localStorage.getItem('homeBankData');
-    
-    new QRCode(qrContainer, { text: dataStr, width: 250, height: 250 });
-    wrapper.style.display = "block";
-    alert("Покажите этот QR-код на другом телефоне и отсканируйте его там!");
-}
-
-function startSyncScanner() {
-    const readerElement = document.getElementById('reader');
-    readerElement.style.display = "block";
-    if (html5QrCode) { stopScanner(); }
-    html5QrCode = new Html5Qrcode("reader");
-
-    html5QrCode.start(
-        { facingMode: "environment" }, { fps: 10, qrbox: 250 },
-        (decodedText) => {
-            if (decodedText.startsWith('SYNC|')) {
-                let rawData = decodedText.split('SYNC|')[1];
-                localStorage.setItem('homeBankData', rawData);
-                bankAccounts = JSON.parse(rawData);
-                updateUI();
-                alert("🎉 Данные банка успешно синхронизированы и обновлены!");
-                location.reload(); // Перезагружаем страницу для обновления данных
-            } else {
-                alert("Это не код синхронизации!");
-            }
-            stopScanner();
-        }, (err) => {}
-    ).catch((err) => { alert("Камера недоступна."); });
 }
 
 function saveToStorage() {
@@ -119,6 +98,7 @@ function switchZone(zone) {
     }
 }
 
+// ИСПРАВЛЕННАЯ РЕГИСТРАЦИЯ
 function createAccount() {
     const nameInput = document.getElementById('reg-name');
     const cvvInput = document.getElementById('reg-custom-cvv');
@@ -131,6 +111,9 @@ function createAccount() {
     let formatted = document.getElementById('reg-generated-number').innerText;
     let cleanNumber = formatted.replace(/\s+/g, ''); 
     
+    // Сначала подгружаем актуальную базу, чтобы не затереть других пользователей
+    bankAccounts = initializeBank();
+    
     bankAccounts[cleanNumber] = { 
         owner: name, 
         balance: 0, 
@@ -138,18 +121,26 @@ function createAccount() {
         formattedNumber: formatted,
         isAdmin: false
     };
+    
+    // Сохраняем жестко в localStorage
     saveToStorage();
     
     alert(`🎉 Счет успешно создан!\nНомер счета: ${formatted}\nCVV: ${customCVV}`);
+    
+    // Переключаем зону и подставляем данные для входа автоматически
     switchZone('login');
     document.getElementById('login-number').value = formatted;
+    document.getElementById('login-cvv').value = customCVV;
+    
     nameInput.value = ""; cvvInput.value = "";
 }
 
+// ИСПРАВЛЕННЫЙ ВХОД
 function loginAccount() {
     let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
     const cvvInput = document.getElementById('login-cvv').value.trim();
     
+    // Подтягиваем базу с устройства, включая только что созданный аккаунт
     bankAccounts = initializeBank();
 
     if (numberInput === "77777777" && cvvInput === "8354") {
@@ -159,10 +150,12 @@ function loginAccount() {
     }
 
     if (!bankAccounts[numberInput]) {
-        alert("Пользователь с таким номером счета не найден!"); return;
+        alert("Пользователь с таким номером счета не найден! Перепроверьте номер."); 
+        return;
     }
     if (bankAccounts[numberInput].cvv !== cvvInput) {
-        alert("Неверный CVV код безопасности!"); return;
+        alert("Неверный CVV код безопасности!"); 
+        return;
     }
     
     localStorage.setItem('activeBankSession', numberInput);
@@ -208,6 +201,8 @@ function logout() {
     myAccountNumber = "";
     document.getElementById('account-zone').style.display = "none";
     document.getElementById('login-zone').style.display = "block";
+    document.getElementById('login-number').value = "";
+    document.getElementById('login-cvv').value = "";
 }
 
 function toggleQRCodeZone() {
@@ -303,7 +298,40 @@ function transferMoney() {
     if (myAccountNumber !== "77777777") { updateUI(); }
     
     amountInput.value = ""; document.getElementById('target-account-number').value = "";
-    alert(`Успешно переведено ${amount} монет! 🎉 Если играете с разных телефонов, покажите QR синхронизации!`);
+    alert(`Успешно переведено ${amount} монет! 🎉 Если играете с разных телефонов, используйте QR синхронизации внизу страницы!`);
+}
+
+function exportBankDatabase() {
+    let qrContainer = document.getElementById('sync-qr-container');
+    let wrapper = document.getElementById('sync-qr-wrapper');
+    qrContainer.innerHTML = "";
+    let dataStr = "SYNC|" + localStorage.getItem('homeBankData');
+    new QRCode(qrContainer, { text: dataStr, width: 250, height: 250 });
+    wrapper.style.display = "block";
+    alert("Отсканируйте этот код с другого телефона для переноса данных!");
+}
+
+function startSyncScanner() {
+    const readerElement = document.getElementById('reader');
+    readerElement.style.display = "block";
+    if (html5QrCode) { stopScanner(); }
+    html5QrCode = new Html5Qrcode("reader");
+
+    html5QrCode.start(
+        { facingMode: "environment" }, { fps: 10, qrbox: 250 },
+        (decodedText) => {
+            if (decodedText.startsWith('SYNC|')) {
+                let rawData = decodedText.split('SYNC|')[1];
+                localStorage.setItem('homeBankData', rawData);
+                bankAccounts = JSON.parse(rawData);
+                alert("🎉 Синхронизация успешна!");
+                location.reload();
+            } else {
+                alert("Это не код синхронизации базы!");
+            }
+            stopScanner();
+        }, (err) => {}
+    ).catch((err) => { alert("Камера недоступна."); });
 }
 
 function updateUI() {
