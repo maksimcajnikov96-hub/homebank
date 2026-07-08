@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Эксклюзивный Детский Банк</title>
-    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eef2f7; padding: 15px; color: #333; margin: 0; }
         h1 { text-align: center; color: #2c3e50; margin: 20px 0; font-size: 24px; }
@@ -23,10 +22,8 @@
         .account-number { font-family: monospace; background: #f8f9fa; padding: 6px 12px; border-radius: 6px; border: 1px dashed #3498db; color: #2980b9; font-size: 18px; display: inline-block; margin-top: 5px; margin-bottom: 12px; }
         .cvv-number { font-family: monospace; background: #f1c40f; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 16px; }
         .admin-badge { background-color: #9b59b6; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
-        
-        #qr-container-wrapper { display: none; text-align: center; margin-top: 15px; }
-        #qr-image { margin-top: 10px; border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 10px; max-width: 200px; width: 100%; }
-        #reader { width: 100%; max-width: 350px; margin: 15px auto; border-radius: 10px; overflow: hidden; }
+        .quick-user-btn { background-color: #f3f4f6; color: #2c3e50; border: 1px solid #d1d5db; margin-bottom: 8px; text-align: left; padding: 12px; font-size: 15px; }
+        .quick-user-btn:hover { background-color: #e5e7eb; }
     </style>
 </head>
 <body>
@@ -62,35 +59,27 @@
         <p>Ваш секретный CVV: <span class="cvv-number" id="display-cvv">000</span></p>
         <p style="font-size: 28px; margin: 20px 0;">Баланс: <strong id="balance" style="color: #2ecc71;">0</strong> 🪙</p>
         
-        <div id="qr-request-zone">
-            <h4>Запросить перевод по QR-коду 📱</h4>
-            <label>Какую сумму вы хотите получить?</label>
-            <input type="number" id="qr-requested-amount" placeholder="Введите количество монет" min="1">
-            <button class="btn-purple" onclick="generateQRWithAmount()">Показать мой QR-код ✨</button>
-            
-            <div id="qr-container-wrapper" id="qr-wrapper">
-                <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 5px;">Покажите этот код для сканирования:</p>
-                <img id="qr-image" src="" alt="QR Код">
-            </div>
-        </div>
-
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         
         <div id="admin-deposit-zone" style="display: none;">
-            <h4>🎁 Выдать монеты за задание</h4>
+            <h4>🎁 Напечатать новые монеты в казну</h4>
             <input type="number" id="deposit-amount" placeholder="Количество монет" min="1">
-            <button class="btn-alt" onclick="addMoney()">Напечатать монеты ➕</button>
+            <button class="btn-alt" onclick="addMoney()">Добавить монеты в банк ➕</button>
             <br><br><hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         </div>
 
-        <h4 id="transfer-title">💸 Перевод на другой счет</h4>
-        
-        <button class="btn-alt" id="scan-btn" onclick="startScanner()">Сканировать QR-код получателя 📷</button>
-        <div id="reader" style="display: none;"></div>
-        
-        <input type="text" id="target-account-number" placeholder="Номер счета получателя (XXXX XXXX)">
-        <input type="number" id="transfer-amount" placeholder="Сумма перевода" min="1">
-        <button class="btn-danger" id="transfer-btn" onclick="transferMoney()">Совершить перевод ➡️</button>
+        <div id="quick-transfers-zone">
+            <h4>👥 Быстрый перевод получателю:</h4>
+            <div id="users-buttons-list">
+                </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <h4>💸 Или перевод по номеру счета:</h4>
+            <input type="text" id="target-account-number" placeholder="Номер счета получателя (XXXX XXXX)">
+            <input type="number" id="transfer-amount" placeholder="Сумма перевода" min="1">
+            <button class="btn-danger" onclick="transferMoney()">Совершить перевод ➡️</button>
+        </div>
         
         <br><br>
         <button onclick="logout()" style="background-color: #95a5a6;">Выйти из кабинета 🔓</button>

@@ -6,10 +6,11 @@ function initializeBank() {
         try { bankBase = JSON.parse(data); } catch (e) { bankBase = {}; }
     }
     
+    // Администратор (Папа)
     let adminKey = "77777777";
     if (!bankBase[adminKey]) {
         bankBase[adminKey] = {
-            owner: "Главный Банкир 👑",
+            owner: "Главный Banker 👑",
             balance: 100000,
             cvv: "8354",
             formattedNumber: "7777 7777",
@@ -17,6 +18,7 @@ function initializeBank() {
         };
     }
     
+    // Дочка (Учетная запись по умолчанию)
     let childKey = "21535477";
     if (!bankBase[childKey]) {
         bankBase[childKey] = {
@@ -34,7 +36,6 @@ function initializeBank() {
 
 let bankAccounts = initializeBank();
 let myAccountNumber = ""; 
-let html5QrCode = null; 
 
 window.addEventListener('DOMContentLoaded', () => {
     let savedNumber = localStorage.getItem('activeBankSession');
@@ -44,24 +45,6 @@ window.addEventListener('DOMContentLoaded', () => {
             autoLoginAdmin();
         } else if (bankAccounts[savedNumber]) {
             autoLogin(savedNumber);
-        }
-    }
-    
-    if (document.getElementById('account-zone')) {
-        let syncDiv = document.getElementById('sync-zone-wrapper');
-        if (!syncDiv) {
-            syncDiv = document.createElement('div');
-            syncDiv.id = 'sync-zone-wrapper';
-            syncDiv.innerHTML = `
-                <br><hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-                <h4>Облако: Синхронизация между телефонами</h4>
-                <button class="btn-purple" onclick="exportBankDatabase()">Показать QR синхронизации 🔄</button>
-                <button class="btn-alt" onclick="startSyncScanner()">Сканировать QR синхронизации 📷</button>
-                <div id="sync-qr-wrapper" style="display:none; text-align:center; margin-top:15px;">
-                    <img id="sync-qr-image" style="margin-top:10px; border:4px solid white; box-shadow:0 4px 12px rgba(0,0,0,0.1); border-radius:10px; max-width:220px; width:100%;" src="" alt="QR синхронизации">
-                </div>
-            `;
-            document.getElementById('account-zone').appendChild(syncDiv);
         }
     }
 });
@@ -138,14 +121,12 @@ function autoLoginAdmin() {
     document.getElementById('display-name').innerText = "Главный Банкир 👑";
     document.getElementById('admin-tag').style.display = "inline-block";
     document.getElementById('admin-deposit-zone').style.display = "block";
-    document.getElementById('transfer-title').innerText = "🎁 Выдать монеты на счет ребенка";
-    document.getElementById('transfer-btn').innerText = "Начислить монеты за задание ➡️";
     document.getElementById('display-number').innerText = "7777 7777";
     document.getElementById('display-cvv').innerText = "8354";
     document.getElementById('login-zone').style.display = "none";
     document.getElementById('account-zone').style.display = "block";
     
-    document.getElementById('qr-request-zone').style.display = "none";
+    renderQuickTransferButtons();
     updateUI();
 }
 
@@ -156,74 +137,50 @@ function autoLogin(accountNumber) {
     document.getElementById('display-name').innerText = "Привет, " + user.owner + "! 👋";
     document.getElementById('admin-tag').style.display = "none";
     document.getElementById('admin-deposit-zone').style.display = "none";
-    document.getElementById('transfer-title').innerText = "💸 Перевод на другой счет";
-    document.getElementById('transfer-btn').innerText = "Совершить перевод ➡️";
     document.getElementById('display-number').innerText = user.formattedNumber || accountNumber;
     document.getElementById('display-cvv').innerText = user.cvv;
     document.getElementById('login-zone').style.display = "none";
     document.getElementById('account-zone').style.display = "block";
     
-    document.getElementById('qr-request-zone').style.display = "block";
-    document.getElementById('qr-container-wrapper').style.display = "none";
-    
+    renderQuickTransferButtons();
     updateUI();
 }
 
 function logout() {
-    stopScanner();
     localStorage.removeItem('activeBankSession');
     myAccountNumber = "";
     document.getElementById('account-zone').style.display = "none";
     document.getElementById('login-zone').style.display = "block";
 }
 
-// НАДЁЖНАЯ ГЕНЕРАЦИЯ КАРТИНКИ QR-КОДА ЧЕРЕЗ GOOGLE / QRSERVER API
-function generateQRWithAmount() {
-    const amountInput = document.getElementById('qr-requested-amount');
-    const amount = parseInt(amountInput.value);
+// СОЗДАНИЕ КНОПОК ДЛЯ БЫСТРОГО ВЫБОРА ПОЛЬЗОВАТЕЛЯ
+function renderQuickTransferButtons() {
+    let listContainer = document.getElementById('users-buttons-list');
+    listContainer.innerHTML = "";
     
-    if (isNaN(amount) || amount <= 0) { alert("Введите корректную сумму монет!"); return; }
+    let hasUsers = false;
     
-    let qrDataString = encodeURIComponent(`${myAccountNumber}|${amount}`);
+    for (let id in bankAccounts) {
+        if (id !== myAccountNumber) { // Не показываем самого себя
+            hasUsers = true;
+            let user = bankAccounts[id];
+            
+            let btn = document.createElement('button');
+            btn.className = "quick-user-btn";
+            btn.innerHTML = `👤 <b>${user.owner}</b> (Счет: ${user.formattedNumber || id})`;
+            
+            // При клике на кнопку имя автоматически подставится в поле ввода номера
+            btn.onclick = function() {
+                document.getElementById('target-account-number').value = user.formattedNumber || id;
+                document.getElementById('transfer-amount').focus(); // Переводим фокус на ввод суммы
+            };
+            
+            listContainer.appendChild(btn);
+        }
+    }
     
-    // Генерируем ссылку на картинку QR-кода
-    let qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrDataString}`;
-    
-    // Подставляем ссылку прямо в картинку на экране
-    document.getElementById('qr-image').src = qrApiUrl;
-    document.getElementById('qr-container-wrapper').style.display = "block";
-}
-
-function startScanner() {
-    const readerElement = document.getElementById('reader');
-    readerElement.style.display = "block";
-    if (html5QrCode) { stopScanner(); }
-    html5QrCode = new Html5Qrcode("reader");
-
-    html5QrCode.start(
-        { facingMode: "environment" }, { fps: 10, qrbox: 250 },
-        (decodedText) => {
-            if (decodedText.startsWith('SYNC|')) { stopScanner(); return; }
-            bankAccounts = initializeBank();
-            if (decodedText.includes('|')) {
-                let parts = decodedText.split('|');
-                let scanAccountNumber = parts[0].replace(/\s+/g, ''); 
-                let scanAmount = parts[1];
-                document.getElementById('target-account-number').value = bankAccounts[scanAccountNumber] ? bankAccounts[scanAccountNumber].formattedNumber : scanAccountNumber;
-                document.getElementById('transfer-amount').value = scanAmount;
-            } else {
-                let cleanText = decodedText.replace(/\s+/g, '');
-                document.getElementById('target-account-number').value = bankAccounts[cleanText] ? bankAccounts[cleanText].formattedNumber : decodedText;
-            }
-            stopScanner();
-        }, (err) => {}
-    ).catch((err) => { alert("Камера недоступна."); });
-}
-
-function stopScanner() {
-    if (html5QrCode) {
-        html5QrCode.stop().then(() => { document.getElementById('reader').style.display = "none"; html5QrCode = null; })
-        .catch(() => { document.getElementById('reader').style.display = "none"; html5QrCode = null; });
+    if (!hasUsers) {
+        listContainer.innerHTML = "<p style='color:#7f8c8d; font-size:14px;'>В банке пока нет других счетов.</p>";
     }
 }
 
@@ -236,6 +193,7 @@ function addMoney() {
     saveToStorage(); updateUI(); amountInput.value = "";
 }
 
+// КЛАССИЧЕСКАЯ НАДЕЖНАЯ ФУНКЦИЯ ПЕРЕВОДА
 function transferMoney() {
     let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('transfer-amount');
@@ -243,47 +201,21 @@ function transferMoney() {
     
     bankAccounts = initializeBank();
     if (isNaN(amount) || amount <= 0) { alert("Укажите сумму перевода!"); return; }
-    if (!bankAccounts[targetNumber]) { alert("Счет получателя не найден!"); return; }
-    if (amount > bankAccounts[myAccountNumber].balance) { alert("Недостаточно монет!"); return; }
-    if (targetNumber === myAccountNumber) { alert("Нельзя переводить себе!"); return; }
+    if (!bankAccounts[targetNumber]) { alert("Счет получателя не найден в базе банка!"); return; }
+    if (amount > bankAccounts[myAccountNumber].balance) { alert("Недостаточно монет на счете!"); return; }
+    if (targetNumber === myAccountNumber) { alert("Нельзя переводить монеты самому себе!"); return; }
     
+    // Списание и зачисление
     bankAccounts[myAccountNumber].balance -= amount;
     bankAccounts[targetNumber].balance += amount;
-    saveToStorage(); updateUI();
     
-    amountInput.value = ""; document.getElementById('target-account-number').value = "";
-    alert(`Успешно переведено ${amount} монет! 🎉 Если вы играете на разных телефонах, обновите базу через QR синхронизации.`);
-}
-
-// СИНХРОНИЗАЦИЯ ЧЕРЕЗ КАРТИНКУ QR
-function exportBankDatabase() {
-    let dataStr = encodeURIComponent("SYNC|" + localStorage.getItem('homeBankData'));
-    let qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${dataStr}`;
+    saveToStorage(); 
+    updateUI();
     
-    document.getElementById('sync-qr-image').src = qrApiUrl;
-    document.getElementById('sync-qr-wrapper').style.display = "block";
-    alert("Отсканируйте этот код со второго телефона для полной синхронизации!");
-}
-
-function startSyncScanner() {
-    const readerElement = document.getElementById('reader');
-    readerElement.style.display = "block";
-    if (html5QrCode) { stopScanner(); }
-    html5QrCode = new Html5Qrcode("reader");
-
-    html5QrCode.start(
-        { facingMode: "environment" }, { fps: 10, qrbox: 250 },
-        (decodedText) => {
-            if (decodedText.startsWith('SYNC|')) {
-                let rawData = decodedText.split('SYNC|')[1];
-                localStorage.setItem('homeBankData', rawData);
-                bankAccounts = JSON.parse(rawData);
-                alert("🎉 Синхронизация успешна!");
-                location.reload();
-            } else { alert("Ошибка кода синхронизации."); }
-            stopScanner();
-        }, (err) => {}
-    ).catch((err) => { alert("Камера недоступна."); });
+    amountInput.value = ""; 
+    document.getElementById('target-account-number').value = "";
+    
+    alert(`🎉 Успешно переведено ${amount} монет пользователю ${bankAccounts[targetNumber].owner}!`);
 }
 
 function updateUI() {
