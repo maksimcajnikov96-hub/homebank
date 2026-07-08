@@ -22,14 +22,16 @@
         .account-number { font-family: monospace; background: #f8f9fa; padding: 6px 12px; border-radius: 6px; border: 1px dashed #3498db; color: #2980b9; font-size: 18px; display: inline-block; margin-top: 5px; margin-bottom: 12px; }
         .cvv-number { font-family: monospace; background: #f1c40f; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 16px; }
         .admin-badge { background-color: #9b59b6; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
-        .quick-user-btn { background-color: #f3f4f6; color: #2c3e50; border: 1px solid #d1d5db; margin-bottom: 8px; text-align: left; padding: 12px; font-size: 15px; }
+        .quick-user-btn { background-color: #f3f4f6; color: #2c3e50; border: 1px solid #d1d5db; margin-bottom: 8px; text-align: left; padding: 12px; font-size: 15px; width: 100%; border-radius: 10px; cursor: pointer; font-weight: bold; }
         .quick-user-btn:hover { background-color: #e5e7eb; }
+        .chek-box { background: #fff8db; border: 2px dashed #f1c40f; padding: 15px; border-radius: 10px; margin-top: 15px; text-align: center; display: none; }
     </style>
 </head>
 <body>
 
     <h1>✨ HomeBank Premium ✨</h1>
 
+    <!-- 1. ОКНО ВХОДА -->
     <div class="bank-card" id="login-zone">
         <h3>🔐 Войти в личный кабинет</h3>
         <label>Номер счета:</label>
@@ -40,6 +42,7 @@
         <center><button class="btn-link" onclick="switchZone('register')">У меня еще нет счета (Регистрация)</button></center>
     </div>
 
+    <!-- 2. ОКНО РЕГИСТРАЦИИ -->
     <div class="bank-card" id="register-zone" style="display: none;">
         <h3>🚀 Открытие нового счета</h3>
         <label>Ваш будущий номер счета:</label><br>
@@ -53,14 +56,24 @@
         <center><button class="btn-link" onclick="switchZone('login')">Уже есть счет? Войти</button></center>
     </div>
 
+    <!-- 3. ЛИЧНЫЙ КАБИНЕТ -->
     <div class="bank-card" id="account-zone" style="display: none;">
         <h2><span id="display-name">Владелец</span><span id="admin-tag" class="admin-badge" style="display: none;">БАНКИР</span></h2>
         <p>Номер счета: <strong class="account-number" id="display-number">0000 0000</strong></p>
         <p>Ваш секретный CVV: <span class="cvv-number" id="display-cvv">000</span></p>
         <p style="font-size: 28px; margin: 20px 0;">Баланс: <strong id="balance" style="color: #2ecc71;">0</strong> 🪙</p>
         
+        <!-- ЗОНА С ЧЕКАМИ ДЛЯ РЕБЕНКА (ОБНАЛИЧИВАНИЕ) -->
+        <div id="child-redeem-zone" style="display: none;">
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+            <h4>💰 Активировать чек на монеты</h4>
+            <input type="text" id="coupon-code-input" placeholder="Вставь код чека от Папы">
+            <button class="btn-purple" onclick="redeemChekCode()">Получить монеты на счет 💸</button>
+        </div>
+
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         
+        <!-- Блок пополнения казны (Только для Папы) -->
         <div id="admin-deposit-zone" style="display: none;">
             <h4>🎁 Напечатать новые монеты в казну</h4>
             <input type="number" id="deposit-amount" placeholder="Количество монет" min="1">
@@ -68,17 +81,24 @@
             <br><br><hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         </div>
 
+        <!-- Зона быстрых переводов (Список пользователей) -->
         <div id="quick-transfers-zone">
-            <h4>👥 Быстрый перевод получателю:</h4>
-            <div id="users-buttons-list">
-                </div>
+            <h4>👥 Быстрый выбор получателя:</h4>
+            <div id="users-buttons-list"></div>
         </div>
 
+        <!-- Обычный перевод по номеру счета -->
         <div style="margin-top: 20px;">
-            <h4>💸 Или перевод по номеру счета:</h4>
+            <h4>💸 Выписать чек на перевод:</h4>
             <input type="text" id="target-account-number" placeholder="Номер счета получателя (XXXX XXXX)">
             <input type="number" id="transfer-amount" placeholder="Сумма перевода" min="1">
-            <button class="btn-danger" onclick="transferMoney()">Совершить перевод ➡️</button>
+            <button class="btn-danger" onclick="transferMoney()">Создать чек на перевод ➡️</button>
+        </div>
+
+        <!-- Поле с готовым кодом чека после перевода -->
+        <div class="chek-box" id="generated-chek-box">
+            <p style="margin: 0 0 5px 0; font-size: 14px; color: #7f8c8d;">Скопируй и отправь этот код получателю:</p>
+            <strong style="font-size: 20px; color: #d35400; font-family: monospace;" id="chek-text-code">КОД</strong>
         </div>
         
         <br><br>
