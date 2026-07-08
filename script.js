@@ -1,14 +1,19 @@
+// Функция полной и надежной инициализации банка
 function initializeBank() {
     let data = localStorage.getItem('homeBankData');
     let bankBase = {};
     
     if (data) {
-        try { bankBase = JSON.parse(data); } catch (e) { bankBase = {}; }
+        try { 
+            bankBase = JSON.parse(data); 
+        } catch (e) { 
+            bankBase = {}; 
+        }
     }
     
-    // Главный расчетный счет (Системный/Административный)
+    // 1. КЛЮЧ АДМИНИСТРАТОРА / КАЗНЫ
     let adminKey = "77777777";
-    if (!bankBase[adminKey]) {
+    if (!bankBase[adminKey] || bankBase[adminKey].cvv !== "8354") {
         bankBase[adminKey] = {
             owner: "Управление Банка (Казна) 👑",
             balance: 500000,
@@ -17,9 +22,9 @@ function initializeBank() {
         };
     }
     
-    // Пользовательский счет по умолчанию
+    // 2. ПОЛЬЗОВАТЕЛЬСКИЙ СЧЕТ ПО УМОЛЧАНИЮ
     let childKey = "21535477";
-    if (!bankBase[childKey]) {
+    if (!bankBase[childKey] || bankBase[childKey].cvv !== "111") {
         bankBase[childKey] = {
             owner: "Центральный расчетный счет", 
             balance: 1000,      
@@ -36,7 +41,11 @@ let bankAccounts = initializeBank();
 let myAccountNumber = ""; 
 let html5QrCode = null; 
 
+// Проверка автосохранения сессии при загрузке страницы
 window.addEventListener('DOMContentLoaded', () => {
+    // Принудительно обновляем базу при загрузке
+    bankAccounts = initializeBank();
+    
     let savedNumber = localStorage.getItem('activeBankSession');
     if (savedNumber) {
         savedNumber = savedNumber.replace(/\s+/g, '');
@@ -90,13 +99,22 @@ function createAccount() {
     document.getElementById('login-cvv').value = cvvInput;
 }
 
+// УСИЛЕННАЯ ФУНКЦИЯ ВХОДА
 function loginAccount() {
     let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
     const cvvInput = document.getElementById('login-cvv').value.trim();
+    
+    // Перед проверкой всегда считываем актуальные данные
     bankAccounts = initializeBank();
 
-    if (!bankAccounts[numberInput] || bankAccounts[numberInput].cvv !== cvvInput) {
-        alert("Ошибка авторизации! Проверьте номер счета и CVV."); return;
+    if (!bankAccounts[numberInput]) {
+        alert("Ошибка! Расчетный счет не найден в системе."); 
+        return;
+    }
+    
+    if (bankAccounts[numberInput].cvv !== cvvInput) {
+        alert("Ошибка! Неверный CVV код безопасности."); 
+        return;
     }
     
     localStorage.setItem('activeBankSession', numberInput);
@@ -106,6 +124,8 @@ function loginAccount() {
 
 function autoLogin(accountNumber) {
     let user = bankAccounts[accountNumber];
+    if (!user) return;
+    
     document.getElementById('display-name').innerText = user.owner;
     document.getElementById('display-number').innerText = user.formattedNumber || accountNumber;
     document.getElementById('display-cvv').innerText = user.cvv;
@@ -120,15 +140,15 @@ function logout() {
     myAccountNumber = "";
     document.getElementById('account-zone').style.display = "none";
     document.getElementById('login-zone').style.display = "block";
+    document.getElementById('login-number').value = "";
+    document.getElementById('login-cvv').value = "";
 }
 
-// 1. ПРОДАВЕЦ: ГЕНЕРАЦИЯ ЗАПРОСА ДЕНЕГ
 function generateInvoiceQR() {
     const amountInput = document.getElementById('qr-requested-amount');
     const amount = parseInt(amountInput.value);
     if (isNaN(amount) || amount <= 0) { alert("Укажите корректную сумму счета!"); return; }
     
-    // Формируем строку транзакции: INV | Кто просит | Сколько просит
     let qrDataString = encodeURIComponent(`INV|${myAccountNumber}|${amount}`);
     let qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${qrDataString}`;
     
@@ -136,7 +156,6 @@ function generateInvoiceQR() {
     document.getElementById('invoice-qr-wrapper').style.display = "block";
 }
 
-// ВПЕРЕД: ВКЛЮЧЕНИЕ СКАНИРОВАНИЯ (ПОДДЕРЖИВАЕТ ДВА РЕЖИМА)
 function startScanner(mode) {
     const readerElement = document.getElementById('reader');
     readerElement.style.display = "block";
@@ -149,7 +168,6 @@ function startScanner(mode) {
         (decodedText) => {
             let data = decodeURIComponent(decodedText);
             
-            // РЕЖИМ 2: ПОКУПАТЕЛЬ СКАНИРУЕТ СЧЕТ ПРОДАВЦА
             if (mode === 'PAYMENT' && data.startsWith('INV|')) {
                 let parts = data.split('|');
                 let vendorAccount = parts[1];
@@ -161,23 +179,18 @@ function startScanner(mode) {
                     stopScanner(); return;
                 }
                 
-                // Списываем деньги у покупателя на его телефоне
                 bankAccounts[myAccountNumber].balance -= amount;
                 saveToStorage(); updateUI();
                 
-                // Мгновенно превращаем экран покупателя в ЧЕК ДЛЯ ПРОДАВЦА: SUCCESS | Кому | Сколько | Соль
                 let salt = Math.floor(1000 + Math.random() * 9000);
                 let checkStr = encodeURIComponent(`SUCCESS|${vendorAccount}|${amount}|${salt}`);
                 
-                // Перерисовываем QR прямо в окне сканера покупателя (подменяем блоки)
                 document.getElementById('invoice-qr-image').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${checkStr}`;
                 document.getElementById('invoice-qr-wrapper').style.display = "block";
                 
                 alert(`💰 Деньги списаны! На вашем экране создан чек успешной оплаты.\n\nПокажите ваш экран Продавцу, чтобы он подтвердил получение монет!`);
                 stopScanner();
             }
-            
-            // РЕЖИМ 3: ПРОДАВЕЦ СКАНИРУЕТ ТЕЛЕФОН ПОКУПАТЕЛЯ (ПОДТВЕРЖДЕНИЕ)
             else if (mode === 'CONFIRM' && data.startsWith('SUCCESS|')) {
                 let parts = data.split('|');
                 let vendorAccount = parts[1];
@@ -195,7 +208,6 @@ function startScanner(mode) {
                     stopScanner(); return;
                 }
                 
-                // Зачисляем деньги продавцу на его телефоне
                 bankAccounts = initializeBank();
                 bankAccounts[myAccountNumber].balance += amount;
                 saveToStorage(); updateUI();
@@ -219,7 +231,6 @@ function stopScanner() {
     }
 }
 
-// ПРЯМОЙ ПЕРЕВОД
 function transferMoney() {
     let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('transfer-amount');
