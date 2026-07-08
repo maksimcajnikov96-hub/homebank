@@ -3,106 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Эксклюзивный Детский Банк</title>
+    <title>HomeBank Business Premium</title>
+    <!-- Официальные стабильные библиотеки для QR -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eef2f7; padding: 15px; color: #333; margin: 0; }
-        h1 { text-align: center; color: #2c3e50; margin: 20px 0; font-size: 24px; }
-        h3, h4 { margin-top: 0; color: #34495e; }
-        .bank-card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 420px; margin: 0 auto 20px auto; box-sizing: border-box; }
-        button { background-color: #2ecc71; color: white; border: none; padding: 14px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 16px; transition: 0.2s; -webkit-tap-highlight-color: transparent; }
-        button:hover { background-color: #27ae60; }
-        .btn-alt { background-color: #3498db; }
-        .btn-alt:hover { background-color: #2980b9; }
-        .btn-purple { background-color: #9b59b6; }
-        .btn-purple:hover { background-color: #8e44ad; }
-        .btn-danger { background-color: #e74c3c; }
-        .btn-danger:hover { background-color: #c0392b; }
-        .btn-link { background: none; color: #3498db; border: none; padding: 5px; width: auto; font-weight: normal; text-decoration: underline; margin-top: 15px; font-size: 14px; }
-        input { padding: 12px; width: 100%; border-radius: 10px; border: 1px solid #ccc; margin-top: 8px; margin-bottom: 15px; font-size: 16px; box-sizing: border-box; }
-        .account-number { font-family: monospace; background: #f8f9fa; padding: 6px 12px; border-radius: 6px; border: 1px dashed #3498db; color: #2980b9; font-size: 18px; display: inline-block; margin-top: 5px; margin-bottom: 12px; }
-        .cvv-number { font-family: monospace; background: #f1c40f; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 16px; }
-        .admin-badge { background-color: #9b59b6; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
-        .quick-user-btn { background-color: #f3f4f6; color: #2c3e50; border: 1px solid #d1d5db; margin-bottom: 8px; text-align: left; padding: 12px; font-size: 15px; width: 100%; border-radius: 10px; cursor: pointer; font-weight: bold; }
-        .quick-user-btn:hover { background-color: #e5e7eb; }
-        .chek-box { background: #fff8db; border: 2px dashed #f1c40f; padding: 15px; border-radius: 10px; margin-top: 15px; text-align: center; display: none; }
+        body { font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f3f4f6; padding: 15px; color: #111827; margin: 0; }
+        h1 { text-align: center; color: #1f2937; margin: 20px 0; font-size: 22px; font-weight: 700; }
+        h3, h4 { margin-top: 0; color: #374151; font-weight: 600; }
+        .bank-card { background: white; padding: 24px; border-radius: 20px; box-shadow: 0 4px 18px rgba(0,0,0,0.03); max-width: 440px; margin: 0 auto 20px auto; box-sizing: border-box; }
+        button { background-color: #10b981; color: white; border: none; padding: 16px 20px; border-radius: 12px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 10px; font-size: 16px; transition: background 0.2s; -webkit-tap-highlight-color: transparent; }
+        button:hover { background-color: #059669; }
+        .btn-alt { background-color: #3b82f6; }
+        .btn-alt:hover { background-color: #2563eb; }
+        .btn-dark { background-color: #1f2937; }
+        .btn-dark:hover { background-color: #111827; }
+        .btn-danger { background-color: #ef4444; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-link { background: none; color: #3b82f6; border: none; padding: 5px; width: auto; font-weight: 500; text-decoration: none; margin-top: 15px; font-size: 14px; }
+        input { padding: 14px; width: 100%; border-radius: 12px; border: 1px solid #d1d5db; margin-top: 8px; margin-bottom: 16px; font-size: 16px; box-sizing: border-box; background-color: #f9fafb; }
+        input:focus { border-color: #3b82f6; outline: none; background-color: #fff; }
+        .account-number { font-family: monospace; background: #f3f4f6; padding: 8px 14px; border-radius: 8px; color: #1e3a8a; font-size: 18px; display: inline-block; margin-top: 5px; margin-bottom: 12px; font-weight: 600; letter-spacing: 1px; }
+        .cvv-number { font-family: monospace; background: #f59e0b; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 15px; }
+        #reader { width: 100%; max-width: 360px; margin: 15px auto; border-radius: 14px; overflow: hidden; display: none; border: 2px solid #e5e7eb; }
+        .qr-wrapper { display: none; text-align: center; margin-top: 15px; padding: 15px; background: #f9fafb; border-radius: 12px; border: 1px dashed #ced4da; }
+        .qr-img { margin-top: 10px; border: 6px solid white; box-shadow: 0 4px 14px rgba(0,0,0,0.08); border-radius: 10px; max-width: 200px; width: 100%; }
+        .balance-text { font-size: 32px; margin: 15px 0; font-weight: 700; color: #10b981; }
     </style>
 </head>
 <body>
 
-    <h1>✨ HomeBank Premium ✨</h1>
+    <h1>🏦 HomeBank Central</h1>
 
     <!-- 1. ОКНО ВХОДА -->
     <div class="bank-card" id="login-zone">
-        <h3>🔐 Войти в личный кабинет</h3>
+        <h3>🔐 Авторизация в системе</h3>
         <label>Номер счета:</label>
-        <input type="text" id="login-number" placeholder="XXXX XXXX">
-        <label>CVV код:</label>
-        <input type="password" id="login-cvv" placeholder="***" maxlength="4">
-        <button class="btn-alt" onclick="loginAccount()">Войти в банк 🚪</button>
-        <center><button class="btn-link" onclick="switchZone('register')">У меня еще нет счета (Регистрация)</button></center>
+        <input type="text" id="login-number" placeholder="7777 7777">
+        <label>Пароль / CVV:</label>
+        <input type="password" id="login-cvv" placeholder="••••" maxlength="4">
+        <button class="btn-dark" onclick="loginAccount()">Войти в систему 🚪</button>
+        <center><button class="btn-link" onclick="switchZone('register')">Создать новый расчетный счет</button></center>
     </div>
 
     <!-- 2. ОКНО РЕГИСТРАЦИИ -->
     <div class="bank-card" id="register-zone" style="display: none;">
-        <h3>🚀 Открытие нового счета</h3>
-        <label>Ваш будущий номер счета:</label><br>
+        <h3>🚀 Открытие расчетного счета</h3>
+        <label>Ваш номер счета:</label><br>
         <strong class="account-number" id="reg-generated-number">Генерируется...</strong>
         <br>
-        <label>Имя владельца:</label>
-        <input type="text" id="reg-name" placeholder="Например, Артём">
-        <label>Придумайте свой CVV код (3 цифры):</label>
-        <input type="text" id="reg-custom-cvv" placeholder="Например, 777" maxlength="3">
-        <button onclick="createAccount()">Зарегистрироваться</button>
-        <center><button class="btn-link" onclick="switchZone('login')">Уже есть счет? Войти</button></center>
+        <label>ФИО Владельца:</label>
+        <input type="text" id="reg-name" placeholder="Иванов И.И.">
+        <label>Придумайте CVV код безопасности (3-4 цифры):</label>
+        <input type="password" id="reg-custom-cvv" placeholder="Например, 123" maxlength="4">
+        <button onclick="createAccount()">Подтвердить открытие счета</button>
+        <center><button class="btn-link" onclick="switchZone('login')">Вернуться к авторизации</button></center>
     </div>
 
     <!-- 3. ЛИЧНЫЙ КАБИНЕТ -->
     <div class="bank-card" id="account-zone" style="display: none;">
-        <h2><span id="display-name">Владелец</span><span id="admin-tag" class="admin-badge" style="display: none;">БАНКИР</span></h2>
-        <p>Номер счета: <strong class="account-number" id="display-number">0000 0000</strong></p>
-        <p>Ваш секретный CVV: <span class="cvv-number" id="display-cvv">000</span></p>
-        <p style="font-size: 28px; margin: 20px 0;">Баланс: <strong id="balance" style="color: #2ecc71;">0</strong> 🪙</p>
+        <h3><span id="display-name">Владелец счета</span></h3>
+        <p style="margin-bottom:8px;">Счет: <strong class="account-number" id="display-number">0000 0000</strong></p>
+        <p style="margin-top:0;">CVV безопасности: <span class="cvv-number" id="display-cvv">000</span></p>
         
-        <!-- ЗОНА С ЧЕКАМИ ДЛЯ РЕБЕНКА (ОБНАЛИЧИВАНИЕ) -->
-        <div id="child-redeem-zone" style="display: none;">
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-            <h4>💰 Активировать чек на монеты</h4>
-            <input type="text" id="coupon-code-input" placeholder="Вставь код чека от Папы">
-            <button class="btn-purple" onclick="redeemChekCode()">Получить монеты на счет 💸</button>
+        <div style="background: #f0fdf4; padding: 12px; border-radius: 12px; text-align: center; margin: 20px 0;">
+            <span style="color: #15803d; font-size: 14px; font-weight: 500;">Доступный остаток:</span>
+            <div class="balance-text"><span id="balance">0.00</span> 🪙</div>
         </div>
 
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        
-        <!-- Блок пополнения казны (Только для Папы) -->
-        <div id="admin-deposit-zone" style="display: none;">
-            <h4>🎁 Напечатать новые монеты в казну</h4>
-            <input type="number" id="deposit-amount" placeholder="Количество монет" min="1">
-            <button class="btn-alt" onclick="addMoney()">Добавить монеты в банк ➕</button>
-            <br><br><hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <!-- КЛАССИЧЕСКИЙ СБП И QR-ОПЛАТА -->
+        <div style="background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0;">
+            <h4>QR-код и Система Быстрых Платежей</h4>
+            
+            <!-- Генерация требования оплаты -->
+            <label>Сумма к получению (Выставить счет):</label>
+            <input type="number" id="qr-requested-amount" placeholder="0.00" min="1">
+            <button class="btn-alt" onclick="generateInvoiceQR()">1. Создать QR на оплату 📱</button>
+            
+            <!-- Окно отображения QR -->
+            <div class="qr-wrapper" id="invoice-qr-wrapper">
+                <p style="color: #4b5563; font-size: 13px; margin: 0;">Покупатель должен отсканировать этот код:</p>
+                <img id="invoice-qr-image" class="qr-img" src="" alt="QR">
+            </div>
+
+            <div style="margin-top: 15px;">
+                <button class="btn-dark" onclick="startScanner('PAYMENT')">2. Сканировать и оплатить QR 📷</button>
+                <button class="btn-purple" style="background-color:#8b5cf6;" onclick="startScanner('CONFIRM')">3. Подтвердить получение денег 🏁</button>
+            </div>
+            
+            <div id="reader"></div>
         </div>
 
-        <!-- Зона быстрых переводов (Список пользователей) -->
-        <div id="quick-transfers-zone">
-            <h4>👥 Быстрый выбор получателя:</h4>
-            <div id="users-buttons-list"></div>
-        </div>
-
-        <!-- Обычный перевод по номеру счета -->
-        <div style="margin-top: 20px;">
-            <h4>💸 Выписать чек на перевод:</h4>
+        <!-- КЛАССИЧЕСКИЙ ПЕРЕВОД ПО НОМЕРУ -->
+        <div style="margin-top: 25px;">
+            <h4>💸 Прямой перевод по номеру счета</h4>
             <input type="text" id="target-account-number" placeholder="Номер счета получателя (XXXX XXXX)">
-            <input type="number" id="transfer-amount" placeholder="Сумма перевода" min="1">
-            <button class="btn-danger" onclick="transferMoney()">Создать чек на перевод ➡️</button>
-        </div>
-
-        <!-- Поле с готовым кодом чека после перевода -->
-        <div class="chek-box" id="generated-chek-box">
-            <p style="margin: 0 0 5px 0; font-size: 14px; color: #7f8c8d;">Скопируй и отправь этот код получателю:</p>
-            <strong style="font-size: 20px; color: #d35400; font-family: monospace;" id="chek-text-code">КОД</strong>
+            <input type="number" id="transfer-amount" placeholder="Сумма перевода">
+            <button class="btn-danger" onclick="transferMoney()">Отправить перевод ➡️</button>
         </div>
         
-        <br><br>
-        <button onclick="logout()" style="background-color: #95a5a6;">Выйти из кабинета 🔓</button>
+        <br>
+        <button onclick="logout()" style="background-color: #6b7280;">Выйти из банковского приложения 🔓</button>
     </div>
 
     <script src="script.js"></script>
