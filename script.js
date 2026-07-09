@@ -13,20 +13,12 @@ function getDefaultData() {
 let bankDatabase = getDefaultData();
 let myAccountNumber = ""; 
 
-// Безопасное чтение из localStorage для телефонов
 function safeGetItem(key) {
-    try {
-        return localStorage.getItem(key);
-    } catch (e) {
-        return null;
-    }
+    try { return localStorage.getItem(key); } catch (e) { return null; }
 }
 
-// Безопасная запись в localStorage для телефонов
 function safeSetItem(key, value) {
-    try {
-        localStorage.setItem(key, value);
-    } catch (e) {}
+    try { localStorage.setItem(key, value); } catch (e) {}
 }
 
 async function loadBankData() {
@@ -129,7 +121,6 @@ async function createAccount() {
 }
 
 async function loginAccount() {
-    // ЖЕСТКАЯ ОЧИСТКА: убираем любые случайные мобильные пробелы и невидимые символы
     let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
     let cvvInput = document.getElementById('login-cvv').value.trim().replace(/\s+/g, '');
     
@@ -155,7 +146,7 @@ function autoLogin(accountNumber) {
     document.getElementById('generated-chek-box').style.display = "none";
     
     if (myAccountNumber === "77777777") {
-        document.getElementById('history-title').innerText = "📋 Глобальный аудит транзакций (Казна)";
+        document.getElementById('history-title').innerText = "📋 Глобальный audit транзакций (Казна)";
     } else {
         document.getElementById('history-title').innerText = "📋 История ваших операций";
     }
@@ -169,6 +160,7 @@ function logout() {
     document.getElementById('login-zone').style.display = "block";
 }
 
+// ПЕРЕВОД: АБСОЛЮТНО УСТОЙЧИВ К ЛЮБЫМ ПРОБЕЛАМ ИЗ КЛАВИАТУРЫ ТЕЛЕФОНА
 async function transferMoney() {
     let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('transfer-amount');
@@ -177,7 +169,12 @@ async function transferMoney() {
     await loadBankData(); 
     
     if (isNaN(amount) || amount <= 0) { alert("Укажите сумму!"); return; }
-    if (!bankDatabase.accounts[targetNumber]) { alert("Счет не найден!"); return; }
+    
+    // Проверка существования счета по ОЧИЩЕННОМУ номеру
+    if (!bankDatabase.accounts[targetNumber]) { 
+        alert(`🔒 Ошибка! Расчетный счет [${targetNumber}] не найден в банковской базе.`); 
+        return; 
+    }
     if (amount > bankDatabase.accounts[myAccountNumber].balance) { alert("Недостаточно средств!"); return; }
     if (targetNumber === myAccountNumber) { alert("Нельзя переводить себе!"); return; }
     
@@ -195,12 +192,12 @@ async function transferMoney() {
     document.getElementById('generated-chek-box').style.display = "block";
     
     amountInput.value = ""; document.getElementById('target-account-number').value = "";
-    alert(`🎉 Код перевода успешно создан! Скопируй и передай его получателю.`);
+    alert(`🎉 Код перевода успешно создан! Передайте его получателю.`);
 }
 
 async function redeemSecureCode() {
     let inputField = document.getElementById('coupon-code-input');
-    let token = inputField.value.trim().replace(/\s+/g, ''); // убираем мобильные пробелы
+    let token = inputField.value.trim().replace(/\s+/g, '');
     
     if (!token.startsWith("TX-")) { alert("Неверный формат кода!"); return; }
     
@@ -214,19 +211,16 @@ async function redeemSecureCode() {
     
     await loadBankData();
 
+    // ЖЕЛЕЗНАЯ ПРОВЕРКА ПОЛУЧАТЕЛЯ
     if (receiverAccount !== myAccountNumber) {
-        alert("🔒 Ошибка безопасности! Этот код выписан для другого расчетного счета. Активация отклонена.");
+        alert("🔒 Неверный счет получателя! Данный код выписан для другого расчетного счета. Активация отклонена.");
         return;
     }
     
     let activatedTokens = [];
-    try {
-        activatedTokens = JSON.parse(safeGetItem('usedHomeBankTokens') || "[]");
-    } catch(e){}
+    try { activatedTokens = JSON.parse(safeGetItem('usedHomeBankTokens') || "[]"); } catch(e){}
     
-    if (activatedTokens.includes(txId)) {
-        alert("Этот код уже активирован!"); return;
-    }
+    if (activatedTokens.includes(txId)) { alert("Этот код уже активирован!"); return; }
     
     bankDatabase.accounts[myAccountNumber].balance += amount;
     
@@ -280,9 +274,7 @@ function updateUI() {
     
     logs.forEach(log => {
         if (myAccountNumber === "77777777" || log.from === myAccountNumber || log.to === myAccountNumber) {
-            if (searchQuery !== "" && !log.txId.includes(searchQuery)) {
-                return; 
-            }
+            if (searchQuery !== "" && !log.txId.includes(searchQuery)) { return; }
             
             hasLogs = true;
             let item = document.createElement('div');
@@ -294,7 +286,7 @@ function updateUI() {
             item.innerHTML = `
                 [${log.time}] <span class="tx-id">Транзакция: #${log.txId}</span><br>
                 Отправитель: <b>${nameFrom}</b> -> Получатель: <b>${nameTo}</b><br>
-                Сумма: <b style="color:#10b981;">${log.amount} 🪙</b> | Status: <i>${log.status}</i>
+                Сумма: <b style="color:#10b981;">${log.amount} 🪙</b> | Статус: <i>${log.status}</i>
             `;
             container.appendChild(item);
         }
