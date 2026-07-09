@@ -13,11 +13,26 @@ function getDefaultData() {
 let bankDatabase = getDefaultData();
 let myAccountNumber = ""; 
 
-// Загрузка общей базы из облака (для всех устройств)
+// Безопасное чтение из localStorage для телефонов
+function safeGetItem(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch (e) {
+        return null;
+    }
+}
+
+// Безопасная запись в localStorage для телефонов
+function safeSetItem(key, value) {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e) {}
+}
+
 async function loadBankData() {
-    let localData = localStorage.getItem('homeBankGlobalData');
+    let localData = safeGetItem('homeBankGlobalData');
     if (localData) {
-        bankDatabase = JSON.parse(localData);
+        try { bankDatabase = JSON.parse(localData); } catch(e){}
     }
     
     try {
@@ -29,7 +44,7 @@ async function loadBankData() {
             let resData = await response.json();
             if (resData.record && resData.record.accounts) {
                 bankDatabase = resData.record;
-                localStorage.setItem('homeBankGlobalData', JSON.stringify(bankDatabase));
+                safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
             }
         }
     } catch (e) { console.log("Автономный режим"); }
@@ -38,9 +53,8 @@ async function loadBankData() {
     if (!bankDatabase.accounts["21535477"]) bankDatabase.accounts["21535477"] = getDefaultData().accounts["21535477"];
 }
 
-// Сохранение общей базы в облако (чтобы увидели другие телефоны)
 async function saveBankData() {
-    localStorage.setItem('homeBankGlobalData', JSON.stringify(bankDatabase));
+    safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
     try {
         await fetch(CLOUD_API_URL, {
             method: "PUT",
@@ -56,16 +70,15 @@ async function saveBankData() {
 window.addEventListener('DOMContentLoaded', async () => {
     await loadBankData();
     
-    let savedNumber = localStorage.getItem('activeBankSession');
+    let savedNumber = safeGetItem('activeBankSession');
     if (savedNumber) {
-        savedNumber = savedNumber.replace(/\s+/g, '');
+        savedNumber = savedNumber.trim().replace(/\s+/g, '');
         if (bankDatabase.accounts[savedNumber]) {
             myAccountNumber = savedNumber;
             autoLogin(savedNumber);
         }
     }
     
-    // Постоянное автообновление истории и балансов каждые 3 секунды
     setInterval(async () => {
         if (myAccountNumber !== "") {
             await loadBankData();
@@ -93,13 +106,13 @@ function switchZone(zone) {
 
 async function createAccount() {
     const nameInput = document.getElementById('reg-name').value.trim();
-    const cvvInput = document.getElementById('reg-custom-cvv').value.trim();
+    const cvvInput = document.getElementById('reg-custom-cvv').value.trim().replace(/\s+/g, '');
     
     if (nameInput === "") { alert("Введите ФИО!"); return; }
     if (cvvInput.length < 3 || isNaN(cvvInput)) { alert("CVV должен быть из цифр!"); return; }
     
     let formatted = document.getElementById('reg-generated-number').innerText;
-    let cleanNumber = formatted.replace(/\s+/g, ''); 
+    let cleanNumber = formatted.replace(/\s+/g, '').trim(); 
     
     await loadBankData();
     bankDatabase.accounts[cleanNumber] = { 
@@ -116,22 +129,24 @@ async function createAccount() {
 }
 
 async function loginAccount() {
+    // ЖЕСТКАЯ ОЧИСТКА: убираем любые случайные мобильные пробелы и невидимые символы
     let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
-    const cvvInput = document.getElementById('login-cvv').value.trim();
+    let cvvInput = document.getElementById('login-cvv').value.trim().replace(/\s+/g, '');
     
     await loadBankData();
 
     if (!bankDatabase.accounts[numberInput] || bankDatabase.accounts[numberInput].cvv !== cvvInput) {
-        alert("Неверные данные!"); return;
+        alert("Неверные данные! Проверьте номер счета и CVV."); return;
     }
     
-    localStorage.setItem('activeBankSession', numberInput);
+    safeSetItem('activeBankSession', numberInput);
     myAccountNumber = numberInput;
     autoLogin(numberInput);
 }
 
 function autoLogin(accountNumber) {
     let user = bankDatabase.accounts[accountNumber];
+    if (!user) return;
     document.getElementById('display-name').innerText = user.owner;
     document.getElementById('display-number').innerText = user.formattedNumber || accountNumber;
     document.getElementById('display-cvv').innerText = user.cvv;
@@ -148,13 +163,12 @@ function autoLogin(accountNumber) {
 }
 
 function logout() {
-    localStorage.removeItem('activeBankSession');
+    try { localStorage.removeItem('activeBankSession'); } catch(e){}
     myAccountNumber = "";
     document.getElementById('account-zone').style.display = "none";
     document.getElementById('login-zone').style.display = "block";
 }
 
-// СОЗДАНИЕ ПЕРЕВОДА (ЛОГ СРАЗУ УЛЕТАЕТ В ОБЛАКО)
 async function transferMoney() {
     let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('transfer-amount');
@@ -167,16 +181,13 @@ async function transferMoney() {
     if (amount > bankDatabase.accounts[myAccountNumber].balance) { alert("Недостаточно средств!"); return; }
     if (targetNumber === myAccountNumber) { alert("Нельзя переводить себе!"); return; }
     
-    // Списываем баланс
     bankDatabase.accounts[myAccountNumber].balance -= amount;
     
     let txId = Math.floor(1000 + Math.random() * 9000);
     let secureToken = `TX-${txId}-${myAccountNumber}-${targetNumber}-${amount}`;
     
-    // ВАЖНО: сначала добавляем в массив логов общей базы
     addTransactionToLog(txId, myAccountNumber, targetNumber, amount, "Чек выпущен (Ожидание)");
     
-    // ВАЖНО: сразу отправляем всё в интернет, чтобы лог по ID увидели другие телефоны!
     await saveBankData(); 
     updateUI();
     
@@ -184,13 +195,12 @@ async function transferMoney() {
     document.getElementById('generated-chek-box').style.display = "block";
     
     amountInput.value = ""; document.getElementById('target-account-number').value = "";
-    alert(`🎉 Код создан! Транзакция #${txId} зафиксирована в облаке Гитхаба.`);
+    alert(`🎉 Код перевода успешно создан! Скопируй и передай его получателю.`);
 }
 
-// АКТИВАЦИЯ КОДА С ОБНОВЛЕНИЕМ СТАТУСА В ОБЛАКЕ
 async function redeemSecureCode() {
     let inputField = document.getElementById('coupon-code-input');
-    let token = inputField.value.trim();
+    let token = inputField.value.trim().replace(/\s+/g, ''); // убираем мобильные пробелы
     
     if (!token.startsWith("TX-")) { alert("Неверный формат кода!"); return; }
     
@@ -205,32 +215,33 @@ async function redeemSecureCode() {
     await loadBankData();
 
     if (receiverAccount !== myAccountNumber) {
-        alert("🔒 Ошибка! Этот код предназначен для другого расчетного счета!");
+        alert("🔒 Ошибка безопасности! Этот код выписан для другого расчетного счета. Активация отклонена.");
         return;
     }
     
-    let activatedTokens = JSON.parse(localStorage.getItem('usedHomeBankTokens') || "[]");
+    let activatedTokens = [];
+    try {
+        activatedTokens = JSON.parse(safeGetItem('usedHomeBankTokens') || "[]");
+    } catch(e){}
+    
     if (activatedTokens.includes(txId)) {
         alert("Этот код уже активирован!"); return;
     }
     
-    // Начисляем монеты получателю
     bankDatabase.accounts[myAccountNumber].balance += amount;
     
-    // Находим транзакцию в общей базе интернета и меняем её статус
     if (bankDatabase.logs) {
         let currentLog = bankDatabase.logs.find(l => l.txId === txId.toString());
         if (currentLog) {
-            currentLog.status = "Успешно зачислено";
+            currentLog.status = "Успешно зачислено по коду";
         } else {
-            addTransactionToLog(txId, senderAccount, myAccountNumber, amount, "Успешно зачислено");
+            addTransactionToLog(txId, senderAccount, myAccountNumber, amount, "Успешно зачислено по коду");
         }
     }
     
     activatedTokens.push(txId);
-    localStorage.setItem('usedHomeBankTokens', JSON.stringify(activatedTokens));
+    safeSetItem('usedHomeBankTokens', JSON.stringify(activatedTokens));
     
-    // Синхронизируем изменения с облаком
     await saveBankData();
     inputField.value = "";
     updateUI();
@@ -263,13 +274,12 @@ function updateUI() {
     if (!container) return;
     container.innerHTML = "";
     
-    let searchQuery = document.getElementById('search-tx-id').value.trim();
+    let searchQuery = document.getElementById('search-tx-id').value.trim().replace(/\s+/g, '');
     let hasLogs = false;
     let logs = bankDatabase.logs || [];
     
     logs.forEach(log => {
         if (myAccountNumber === "77777777" || log.from === myAccountNumber || log.to === myAccountNumber) {
-            // Если в поле поиска введен ID, скрываем всё, что под него не подходит
             if (searchQuery !== "" && !log.txId.includes(searchQuery)) {
                 return; 
             }
@@ -284,7 +294,7 @@ function updateUI() {
             item.innerHTML = `
                 [${log.time}] <span class="tx-id">Транзакция: #${log.txId}</span><br>
                 Отправитель: <b>${nameFrom}</b> -> Получатель: <b>${nameTo}</b><br>
-                Сумма: <b style="color:#10b981;">${log.amount} 🪙</b> | Статус: <i>${log.status}</i>
+                Сумма: <b style="color:#10b981;">${log.amount} 🪙</b> | Status: <i>${log.status}</i>
             `;
             container.appendChild(item);
         }
