@@ -29,7 +29,6 @@
         .balance-card-mini { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 12px; text-align: center; }
         .balance-card-mini .amount { font-size: 15px; font-weight: 700; margin-top: 4px; }
         
-        /* Локальные контейнеры для кодов */
         .local-chek-box { background: #fff8db; border: 2px dashed #f1c40f; padding: 12px; border-radius: 10px; margin-top: 12px; text-align: center; display: none; }
         .local-chek-box strong { font-size: 14px; color: #d35400; font-family: monospace; display: block; word-break: break-all; margin-top: 4px; }
 
@@ -147,7 +146,6 @@
             <input type="text" id="admin-debit-reason" placeholder="Например: Штраф за ПДД">
             <button class="btn-danger" style="background-color: #b91c1c; margin-top: 5px;" onclick="createAdminDebitCode()">Создать код списания 🚫</button>
             
-            <!-- Локальный плашка для кода штрафа -->
             <div class="local-chek-box" id="chek-box-admin">
                 <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Код штрафного ордера:</span>
                 <strong id="chek-text-admin">КОД</strong>
@@ -192,12 +190,11 @@
             <button class="btn-purple" onclick="redeemSecureCode()">Активировать код 💸</button>
         </div>
 
-        <!-- КЛАССИЧЕСКИЙ ПЕРЕВОД С ВЫБОРОМ ВАЛЮТЫ -->
+        <!-- КЛАССИЧЕСКИЙ ПЕРЕВОД -->
         <div style="background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
             <h4>💸 Прямой перевод средств</h4>
             <input type="text" id="target-account-number" placeholder="Номер счета получателя (XXXX XXXX)">
             
-            <!-- НОВОЕ: Выбор валюты отправления -->
             <label>Валюта отправления:</label>
             <select id="transfer-currency">
                 <option value="coins">🪙 Монетки</option>
@@ -213,7 +210,6 @@
             <input type="text" id="transfer-reason" placeholder="Например: За работу / Подарок">
             <button class="btn-danger" onclick="transferMoney()">Совершить перевод и создать код ➡️</button>
             
-            <!-- Локальная плашка для кода прямого перевода -->
             <div class="local-chek-box" id="chek-box-transfer">
                 <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Передайте этот код получателю:</span>
                 <strong id="chek-text-transfer">КОД</strong>
@@ -231,16 +227,19 @@
             <input type="text" id="multi-custom-reason" placeholder="Например: Победителю викторины">
             <button class="btn-alt" onclick="createMultiSplitCode()">Создать многоразовый код 🎁</button>
             
-            <!-- Локальная плашка для многоразового кода -->
             <div class="local-chek-box" id="chek-box-multi">
                 <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Многоразовый код на активации:</span>
                 <strong id="chek-text-multi">КОД</strong>
             </div>
         </div>
 
-        <!-- ИСТОРИЯ ТРАНЗАКЦИЙ -->
+        <!-- ИСТОРИЯ ТРАНЗАКЦИЙ С КНОПКОЙ СИНХРОНИЗАЦИИ -->
         <div class="history-wrapper">
-            <h4 id="history-title">📋 История операций</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 id="history-title" style="margin:0;">📋 История операций</h4>
+                <!-- НОВАЯ КНОПКА: Обновление данных из облака без перезагрузки -->
+                <button class="btn-alt" style="margin:0; padding: 8px 12px; font-size: 12px; width: auto;" onclick="manualCloudRefresh()">Обновить 🔄</button>
+            </div>
             <input type="text" id="search-tx-id" class="search-input" placeholder="🔍 Поиск по коду (ID) транзакции..." oninput="updateUI()">
             <div class="history-list" id="history-list-container"></div>
         </div>

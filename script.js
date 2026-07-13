@@ -63,6 +63,7 @@ function decodeDigitsToText(digits) {
     return output;
 }
 
+// ЗАГРУЗКА ИЗ ОБЛАКА (Вызывается строго по необходимости)
 async function loadBankData() {
     let localData = safeGetItem('homeBankGlobalData');
     if (localData) {
@@ -95,6 +96,7 @@ async function loadBankData() {
     } catch (e) { console.log("Автономный режим"); }
 }
 
+// ОТПРАВКА В ОБЛАКО (Срабатывает только при клике на кнопки действий)
 async function saveBankData() {
     safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
     try {
@@ -109,6 +111,13 @@ async function saveBankData() {
     } catch (e) { console.log("Ошибка сети"); }
 }
 
+// Кнопка ручного обновления
+async function manualCloudRefresh() {
+    await loadBankData();
+    updateUI();
+    alert("🔄 Балансы и история успешно синхронизированы с облаком!");
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
     await loadBankData();
     
@@ -120,13 +129,6 @@ window.addEventListener('DOMContentLoaded', async () => {
             autoLogin(savedNumber);
         }
     }
-    
-    setInterval(async () => {
-        if (myAccountNumber !== "") {
-            await loadBankData();
-            updateUI();
-        }
-    }, 3000);
 });
 
 function generateAccountNumber() {
@@ -334,7 +336,6 @@ async function transferMoney() {
     
     let amountInCoins = myCleanNumber === "77777777" ? 0 : amountInSelectedCurrency * RATES[selectedCurrency];
     
-    // ЭКСКЛЮЗИВНЫЙ ФИКС: Для тебя (Казны) блокировка перевода самому себе полностью отключена!
     if (targetNumber === myCleanNumber && myCleanNumber !== "77777777") { 
         alert("Нельзя переводить самому себе!"); 
         return; 
