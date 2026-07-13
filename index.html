@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeBank Central</title>
+    <!-- ПОДКЛЮЧАЕМ БИБЛИОТЕКИ ДЛЯ QR-КОДОВ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f3f4f6; padding: 15px; color: #111827; margin: 0; }
         h1 { text-align: center; color: #1f2937; margin: 20px 0; font-size: 22px; font-weight: 700; }
@@ -30,7 +33,8 @@
         .balance-card-mini .amount { font-size: 15px; font-weight: 700; margin-top: 4px; }
         
         .local-chek-box { background: #fff8db; border: 2px dashed #f1c40f; padding: 12px; border-radius: 10px; margin-top: 12px; text-align: center; display: none; }
-        .local-chek-box strong { font-size: 14px; color: #d35400; font-family: monospace; display: block; word-break: break-all; margin-top: 4px; }
+        .local-chek-box strong { font-size: 14px; color: #d35400; font-family: monospace; display: block; word-break: break-all; margin-top: 4px; margin-bottom: 8px; }
+        .qr-output-zone { display: flex; justify-content: center; margin: 10px 0 5px 0; }
 
         .history-wrapper { margin-top: 25px; background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0; }
         .history-list { max-height: 220px; overflow-y: auto; margin-top: 10px; padding-right: 5px; }
@@ -38,11 +42,25 @@
         .history-item:last-child { border-bottom: none; }
         .tx-id { font-family: monospace; color: #3b82f6; font-weight: bold; }
         .search-input { padding: 10px 14px; margin-bottom: 10px; font-size: 14px; border-radius: 8px; }
+        
+        /* Окно сканера камер */
+        #scanner-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
+        #scanner-container { background: white; padding: 15px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; }
+        #qr-reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
     </style>
 </head>
 <body>
 
     <h1>🏦 HomeBank Central</h1>
+
+    <!-- ОКНО МОБИЛЬНОГО СКАНЕРА (ВСПЛЫВАЮЩЕЕ) -->
+    <div id="scanner-modal">
+        <div id="scanner-container">
+            <h4 style="margin-bottom: 10px;">📷 Наведите камеру на QR-код</h4>
+            <div id="qr-reader"></div>
+            <button class="btn-danger" style="margin-top: 15px; padding: 12px;" onclick="stopQRScanner()">❌ Закрыть камеру</button>
+        </div>
+    </div>
 
     <!-- 1. ОКНО ВХОДА -->
     <div class="bank-card" id="login-zone">
@@ -149,6 +167,7 @@
             <div class="local-chek-box" id="chek-box-admin">
                 <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Код штрафного ордера:</span>
                 <strong id="chek-text-admin">КОД</strong>
+                <div class="qr-output-zone" id="qr-admin-container"></div> <!-- Место для QR-кода -->
             </div>
         </div>
 
@@ -183,10 +202,11 @@
             <button class="btn-alt" style="background-color: #16a34a;" onclick="executeCurrencyExchange()">Подтвердить обмен валюты 💱</button>
         </div>
 
-        <!-- УНИВЕРСАЛЬНЫЙ БЛОК ДЛЯ ВВОДА КОДОВ -->
+        <!-- УНИВЕРСАЛЬНЫЙ БЛОК ДЛЯ ВВОДА КОДОВ (ПЛЮС СКАНЕР) -->
         <div style="background: #fdf2f8; padding: 15px; border-radius: 14px; border: 1px solid #fbcfe8; margin-bottom: 20px;">
-            <h4>💰 Ввести код чека или пополнения</h4>
-            <input type="text" id="coupon-code-input" placeholder="Вставьте полученный код (TX-...)">
+            <h4>💰 Ввести код или чек пополнения</h4>
+            <input type="text" id="coupon-code-input" placeholder="Вставьте код (TX-...) или отсканируйте">
+            <button class="btn-purple" style="margin-bottom: 8px; background-color: #a21caf;" onclick="startQRScanner()">📷 Открыть сканер QR-кода</button>
             <button class="btn-purple" onclick="redeemSecureCode()">Активировать код 💸</button>
         </div>
 
@@ -211,8 +231,9 @@
             <button class="btn-danger" onclick="transferMoney()">Совершить перевод и создать код ➡️</button>
             
             <div class="local-chek-box" id="chek-box-transfer">
-                <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Передайте этот код получателю:</span>
+                <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Передайте этот код или QR получателю:</span>
                 <strong id="chek-text-transfer">КОД</strong>
+                <div class="qr-output-zone" id="qr-transfer-container"></div> <!-- Место для QR-кода -->
             </div>
         </div>
 
@@ -230,6 +251,7 @@
             <div class="local-chek-box" id="chek-box-multi">
                 <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Многоразовый код на активации:</span>
                 <strong id="chek-text-multi">КОД</strong>
+                <div class="qr-output-zone" id="qr-multi-container"></div> <!-- Место для QR-кода -->
             </div>
         </div>
 
@@ -237,7 +259,6 @@
         <div class="history-wrapper">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h4 id="history-title" style="margin:0;">📋 История операций</h4>
-                <!-- НОВАЯ КНОПКА: Обновление данных из облака без перезагрузки -->
                 <button class="btn-alt" style="margin:0; padding: 8px 12px; font-size: 12px; width: auto;" onclick="manualCloudRefresh()">Обновить 🔄</button>
             </div>
             <input type="text" id="search-tx-id" class="search-input" placeholder="🔍 Поиск по коду (ID) транзакции..." oninput="updateUI()">
