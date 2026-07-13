@@ -63,7 +63,7 @@ function decodeDigitsToText(digits) {
     return output;
 }
 
-// ЗАГРУЗКА ИЗ ОБЛАКА (Вызывается строго по необходимости)
+// ЗАГРУЗКА ИЗ ОБЛАКА
 async function loadBankData() {
     let localData = safeGetItem('homeBankGlobalData');
     if (localData) {
@@ -96,7 +96,7 @@ async function loadBankData() {
     } catch (e) { console.log("Автономный режим"); }
 }
 
-// ОТПРАВКА В ОБЛАКО (Срабатывает только при клике на кнопки действий)
+// ОТПРАВКА В ОБЛАКО
 async function saveBankData() {
     safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
     try {
@@ -221,7 +221,7 @@ async function changeUserCurrency() {
     let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
     let newCurrency = document.getElementById('user-change-currency').value;
     
-    await loadBankData();
+    await loadBankData(); // Принудительно обновляем перед изменением
     if (bankDatabase.accounts[myCleanNumber]) {
         bankDatabase.accounts[myCleanNumber].baseCurrency = newCurrency;
         await saveBankData();
@@ -284,7 +284,7 @@ async function executeCurrencyExchange() {
     
     if (isNaN(amount) || amount <= 0) { alert("Укажите сумму!"); return; }
     
-    await loadBankData();
+    await loadBankData(); // КРИТИЧЕСКИЙ ФИКС: Сначала скачиваем актуальные данные из облака!
     let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
     let user = bankDatabase.accounts[myCleanNumber];
     
@@ -328,9 +328,9 @@ async function transferMoney() {
     const amountInSelectedCurrency = parseFloat(amountInput.value);
     let reason = reasonInput.value.trim();
     
-    await loadBankData(); 
     if (isNaN(amountInSelectedCurrency) || amountInSelectedCurrency <= 0) { alert("Укажите сумму!"); return; }
     
+    await loadBankData(); // КРИТИЧЕСКИЙ ФИКС: Скачиваем свежий баланс перед переводом!
     let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
     let sender = bankDatabase.accounts[myCleanNumber];
     
@@ -374,7 +374,7 @@ async function createAdminDebitCode() {
     const amountInAdminCurrency = parseFloat(amountInput.value);
     let reason = reasonInput.value.trim();
     
-    await loadBankData();
+    await loadBankData(); // Синхронизируем перед выпиской штрафа
     let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
     if (myCleanNumber !== "77777777") { alert("🔒 Отказано в доступе!"); return; }
     if (isNaN(amountInAdminCurrency) || amountInAdminCurrency <= 0) { alert("Укажите сумму!"); return; }
@@ -408,10 +408,10 @@ async function createMultiSplitCode() {
     const limit = parseInt(limitInput.value);
     let reason = reasonInput.value.trim();
     
-    await loadBankData();
     if (isNaN(totalPoolInUserCurrency) || totalPoolInUserCurrency <= 0) { alert("Укажите сумму!"); return; }
     if (isNaN(limit) || limit <= 0) { alert("Укажите количество активаций!"); return; }
     
+    await loadBankData(); // КРИТИЧЕСКИЙ ФИКС: Сначала подтягиваем баланс из облака
     let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
     let user = bankDatabase.accounts[myCleanNumber];
     let userBase = user.baseCurrency || "coins";
@@ -461,7 +461,7 @@ async function redeemSecureCode() {
     let amountInCoins = parseInt(parts[4]); 
     let encryptedReason = parts[5].trim().replace(/\s+/g, ''); 
     
-    await loadBankData();
+    await loadBankData(); // Подтягиваем последние данные, чтобы не стереть чужие транзакции
     let currentSessionClean = myAccountNumber.toString().trim().replace(/\s+/g, '');
     let user = bankDatabase.accounts[currentSessionClean];
     let userBase = user.baseCurrency || "coins";
