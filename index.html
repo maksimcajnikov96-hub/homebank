@@ -7,7 +7,7 @@
     <style>
         body { font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f3f4f6; padding: 15px; color: #111827; margin: 0; }
         h1 { text-align: center; color: #1f2937; margin: 20px 0; font-size: 22px; font-weight: 700; }
-        h3, h4 { margin-top: 0; color: #374151; font-weight: 600; }
+        h3, h4, h5 { margin-top: 0; color: #374151; font-weight: 600; }
         .bank-card { background: white; padding: 24px; border-radius: 20px; box-shadow: 0 4px 18px rgba(0,0,0,0.03); max-width: 440px; margin: 0 auto 20px auto; box-sizing: border-box; }
         button { background-color: #10b981; color: white; border: none; padding: 16px 20px; border-radius: 12px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 10px; font-size: 16px; transition: background 0.2s; -webkit-tap-highlight-color: transparent; }
         button:hover { background-color: #059669; }
@@ -20,13 +20,19 @@
         .btn-purple { background-color: #8b5cf6; }
         .btn-purple:hover { background-color: #7c3aed; }
         .btn-link { background: none; color: #3b82f6; border: none; padding: 5px; width: auto; font-weight: 500; text-decoration: none; margin-top: 15px; font-size: 14px; }
-        input { padding: 14px; width: 100%; border-radius: 12px; border: 1px solid #d1d5db; margin-top: 8px; margin-bottom: 16px; font-size: 16px; box-sizing: border-box; background-color: #f9fafb; }
-        input:focus { border-color: #3b82f6; outline: none; background-color: #fff; }
+        input, select { padding: 14px; width: 100%; border-radius: 12px; border: 1px solid #d1d5db; margin-top: 8px; margin-bottom: 16px; font-size: 16px; box-sizing: border-box; background-color: #f9fafb; }
+        input:focus, select:focus { border-color: #3b82f6; outline: none; background-color: #fff; }
         .account-number { font-family: monospace; background: #f3f4f6; padding: 8px 14px; border-radius: 8px; color: #1e3a8a; font-size: 18px; display: inline-block; margin-top: 5px; margin-bottom: 12px; font-weight: 600; letter-spacing: 1px; }
         .cvv-number { font-family: monospace; background: #f59e0b; padding: 4px 10px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 15px; }
-        .balance-text { font-size: 32px; margin: 15px 0; font-weight: 700; color: #10b981; }
         
-        .chek-box { background: #fff8db; border: 2px dashed #f1c40f; padding: 15px; border-radius: 12px; margin-top: 15px; text-align: center; display: none; }
+        .multi-balance-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; }
+        .balance-card-mini { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 12px; text-align: center; }
+        .balance-card-mini .amount { font-size: 15px; font-weight: 700; margin-top: 4px; }
+        
+        /* Локальные контейнеры для кодов */
+        .local-chek-box { background: #fff8db; border: 2px dashed #f1c40f; padding: 12px; border-radius: 10px; margin-top: 12px; text-align: center; display: none; }
+        .local-chek-box strong { font-size: 14px; color: #d35400; font-family: monospace; display: block; word-break: break-all; margin-top: 4px; }
+
         .history-wrapper { margin-top: 25px; background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0; }
         .history-list { max-height: 220px; overflow-y: auto; margin-top: 10px; padding-right: 5px; }
         .history-item { font-size: 13px; padding: 10px; border-bottom: 1px solid #e2e8f0; color: #4b5563; line-height: 1.4; }
@@ -39,6 +45,7 @@
 
     <h1>🏦 HomeBank Central</h1>
 
+    <!-- 1. ОКНО ВХОДА -->
     <div class="bank-card" id="login-zone">
         <h3>🔐 Авторизация в системе</h3>
         <label>Номер счета:</label>
@@ -49,6 +56,7 @@
         <center><button class="btn-link" onclick="switchZone('register')">Создать новый расчетный счет</button></center>
     </div>
 
+    <!-- 2. ОКНО РЕГИСТРАЦИИ -->
     <div class="bank-card" id="register-zone" style="display: none;">
         <h3>🚀 Открытие расчетного счета</h3>
         <label>Ваш номер счета:</label><br>
@@ -56,40 +64,181 @@
         <br>
         <label>ФИО Владельца:</label>
         <input type="text" id="reg-name" placeholder="Иванов И.И.">
+        
+        <label>Выберите основную валюту счета:</label>
+        <select id="reg-base-currency">
+            <option value="coins">🪙 Монетки</option>
+            <option value="usd">💵 Доллар (USD)</option>
+            <option value="eur">💶 Евро (EUR)</option>
+            <option value="cny">🇨🇳 Юань (CNY)</option>
+            <option value="ton">💎 Тонкоин (TON)</option>
+            <option value="btc">🪙 Биткоин (BTC)</option>
+        </select>
+
         <label>Придумайте CVV код безопасности (3-4 цифры):</label>
         <input type="password" id="reg-custom-cvv" placeholder="Например, 123" maxlength="4">
         <button onclick="createAccount()">Подтвердить открытие счета</button>
         <center><button class="btn-link" onclick="switchZone('login')">Вернуться к авторизации</button></center>
     </div>
 
+    <!-- 3. ЛИЧНЫЙ КАБИНЕТ ИГРОКА -->
     <div class="bank-card" id="account-zone" style="display: none;">
         <h3><span id="display-name">Владелец счета</span></h3>
         <p style="margin-bottom:8px;">Счет: <strong class="account-number" id="display-number">0000 0000</strong></p>
-        <p style="margin-top:0;">CVV безопасности: <span class="cvv-number" id="display-cvv">000</span></p>
+        <p style="margin-top:0; margin-bottom: 12px;">CVV безопасности: <span class="cvv-number" id="display-cvv">000</span></p>
         
-        <div style="background: #f0fdf4; padding: 12px; border-radius: 12px; text-align: center; margin: 20px 0;">
-            <span style="color: #15803d; font-size: 14px; font-weight: 500;">Доступный остаток:</span>
-            <div class="balance-text"><span id="balance">0.00</span> 🪙</div>
+        <!-- БЛОК СМЕНЫ ВАЛЮТЫ -->
+        <div style="margin-bottom: 15px; background: #eff6ff; padding: 12px; border-radius: 14px; border: 2px solid #bfdbfe;">
+            <label style="font-size: 13px; color: #1e40af; font-weight: 700;">🔄 Сменить основную валюту кошелька:</label>
+            <select id="user-change-currency" style="margin-top: 6px; margin-bottom: 8px; padding: 10px; font-size: 15px; border-color: #bfdbfe;">
+                <option value="coins">🪙 Монетки</option>
+                <option value="usd">💵 Доллар (USD)</option>
+                <option value="eur">💶 Евро (EUR)</option>
+                <option value="cny">🇨🇳 Юань (CNY)</option>
+                <option value="ton">💎 Тонкоин (TON)</option>
+                <option value="btc">🪙 Биткоин (BTC)</option>
+            </select>
+            <button class="btn-alt" style="margin-top: 0; padding: 12px; width: 100%; font-size: 14px; background-color: #3b82f6;" onclick="changeUserCurrency()">Обновить валюту счета 🔄</button>
         </div>
 
-        <div style="background: #fdf2f8; padding: 15px; border-radius: 14px; border: 1px solid #fbcfe8; margin-bottom: 20px;">
-            <h4>💰 Ввести код пополнения</h4>
-            <input type="text" id="coupon-code-input" placeholder="Вставьте полученный код чека (TX-...)">
-            <button class="btn-purple" onclick="redeemSecureCode()">Активировать код перевода 💸</button>
+        <!-- КРУПНОЕ ОТОБРАЖЕНИЕ ГЛАВНОГО БАЛАНСА -->
+        <div style="background: #f0fdf4; padding: 12px; border-radius: 12px; text-align: center; margin: 15px 0 15px 0; border: 1px solid #bbf7d0;">
+            <span style="color: #15803d; font-size: 14px; font-weight: 500;">Ваш основной баланс:</span>
+            <div style="font-size: 28px; font-weight: 700; color: #10b981;" id="main-balance-render">0.00 COINS</div>
         </div>
 
-        <div style="background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
-            <h4>💸 Прямой перевод средств</h4>
-            <input type="text" id="target-account-number" placeholder="Номер счета получателя (XXXX XXXX)">
-            <input type="number" id="transfer-amount" placeholder="Сумма перевода">
-            <button class="btn-danger" onclick="transferMoney()">Совершить перевод и создать код ➡️</button>
-            
-            <div class="chek-box" id="generated-chek-box">
-                <p style="margin: 0 0 5px 0; font-size: 14px; color: #7f8c8d;">Передайте этот код получателю для зачисления:</p>
-                <strong style="font-size: 15px; color: #d35400; font-family: monospace; display: block; word-break: break-all;" id="chek-text-code">КОД</strong>
+        <!-- МУЛЬТИВАЛЮТНАЯ СЕТКА ДОПОЛНИТЕЛЬНЫХ КОШЕЛЬКОВ -->
+        <div class="multi-balance-grid">
+            <div class="balance-card-mini">
+                <div style="color: #6b7280; font-size: 11px;">Монеты 🪙</div>
+                <div class="amount" id="balance-coins">0.00</div>
+            </div>
+            <div class="balance-card-mini">
+                <div style="color: #15803d; font-size: 11px;">Доллары 💵</div>
+                <div class="amount" id="balance-usd">0.00</div>
+            </div>
+            <div class="balance-card-mini">
+                <div style="color: #1d4ed8; font-size: 11px;">Евро 💶</div>
+                <div class="amount" id="balance-eur">0.00</div>
+            </div>
+            <div class="balance-card-mini">
+                <div style="color: #b45309; font-size: 11px;">Юани 🇨🇳</div>
+                <div class="amount" id="balance-cny">0.00</div>
+            </div>
+            <div class="balance-card-mini">
+                <div style="color: #2563eb; font-size: 11px;">TON 💎</div>
+                <div class="amount" id="balance-ton">0.00</div>
+            </div>
+            <div class="balance-card-mini">
+                <div style="color: #d97706; font-size: 11px;">Bitcoin 🪙</div>
+                <div class="amount" id="balance-btc">0.00</div>
             </div>
         </div>
 
+        <!-- 👑 ШТРАФЫ: Панель Управления Казначея -->
+        <div id="admin-panel" style="background: #fef2f2; padding: 15px; border-radius: 14px; border: 1px solid #fee2e2; margin-bottom: 20px; display: none;">
+            <h4 style="color: #991b1b; margin-bottom: 10px;">👑 Панель Управления Казначея</h4>
+            <h5 style="margin: 0 0 10px 0; color: #b91c1c;">🚫 Выписать код списания (Штраф)</h5>
+            <label>Номер расчетного счета игрока:</label>
+            <input type="text" id="admin-target-account" placeholder="XXXX XXXX">
+            <label>Сумма к списанию (в единицах вашей осн. валюты):</label>
+            <input type="number" id="admin-debit-amount" placeholder="0.00">
+            <label>Причина списания (для истории):</label>
+            <input type="text" id="admin-debit-reason" placeholder="Например: Штраф за ПДД">
+            <button class="btn-danger" style="background-color: #b91c1c; margin-top: 5px;" onclick="createAdminDebitCode()">Создать код списания 🚫</button>
+            
+            <!-- Локальный плашка для кода штрафа -->
+            <div class="local-chek-box" id="chek-box-admin">
+                <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Код штрафного ордера:</span>
+                <strong id="chek-text-admin">КОД</strong>
+            </div>
+        </div>
+
+        <!-- 💱 ОБМЕН ВАЛЮТ (БИРЖА) -->
+        <div style="background: #f0fdf4; padding: 15px; border-radius: 14px; border: 1px solid #bbf7d0; margin-bottom: 20px;">
+            <h4 style="color: #166534;">💱 Обмен валюты (Биржа)</h4>
+            
+            <div style="font-size: 12px; color: #3f6212; background: #dcfce7; padding: 10px; border-radius: 8px; margin-bottom: 12px; line-height: 1.5;" id="exchange-live-rates-box">
+                Загрузка курсов рынка...
+            </div>
+            
+            <label>Направление обмена:</label>
+            <select id="exchange-direction" onchange="updateExchangePreview()">
+                <option value="coins_to_usd">🪙 Монеты ➡️ Доллары 💵</option>
+                <option value="usd_to_coins">💵 Доллары ➡️ Монеты 🪙</option>
+                <option value="coins_to_eur">🪙 Монеты ➡️ Евро 💶</option>
+                <option value="eur_to_coins">💶 Евро ➡️ Монеты 🪙</option>
+                <option value="coins_to_cny">🪙 Монеты ➡️ Юани 🇨🇳</option>
+                <option value="cny_to_coins">🇨🇳 Юани ➡️ Монеты 🪙</option>
+                <option value="coins_to_ton">🪙 Монеты ➡️ TON 💎</option>
+                <option value="ton_to_coins">💎 TON ➡️ Монеты 🪙</option>
+                <option value="coins_to_btc">🪙 Монеты ➡️ Bitcoin 🪙</option>
+                <option value="btc_to_coins">🪙 Bitcoin ➡️ Монеты 🪙</option>
+            </select>
+            
+            <label>Сколько отдаёте:</label>
+            <input type="number" id="exchange-input-amount" placeholder="0" oninput="updateExchangePreview()">
+            
+            <div style="font-size: 14px; font-weight: 600; color: #166534; margin-bottom: 10px;" id="exchange-preview-text">
+                Вы получите: 0.00
+            </div>
+            <button class="btn-alt" style="background-color: #16a34a;" onclick="executeCurrencyExchange()">Подтвердить обмен валюты 💱</button>
+        </div>
+
+        <!-- УНИВЕРСАЛЬНЫЙ БЛОК ДЛЯ ВВОДА КОДОВ -->
+        <div style="background: #fdf2f8; padding: 15px; border-radius: 14px; border: 1px solid #fbcfe8; margin-bottom: 20px;">
+            <h4>💰 Ввести код чека или пополнения</h4>
+            <input type="text" id="coupon-code-input" placeholder="Вставьте полученный код (TX-...)">
+            <button class="btn-purple" onclick="redeemSecureCode()">Активировать код 💸</button>
+        </div>
+
+        <!-- КЛАССИЧЕСКИЙ ПЕРЕВОД С ВЫБОРОМ ВАЛЮТЫ -->
+        <div style="background: #f8fafc; padding: 15px; border-radius: 14px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <h4>💸 Прямой перевод средств</h4>
+            <input type="text" id="target-account-number" placeholder="Номер счета получателя (XXXX XXXX)">
+            
+            <!-- НОВОЕ: Выбор валюты отправления -->
+            <label>Валюта отправления:</label>
+            <select id="transfer-currency">
+                <option value="coins">🪙 Монетки</option>
+                <option value="usd">💵 Доллары (USD)</option>
+                <option value="eur">💶 Евро (EUR)</option>
+                <option value="cny">🇨🇳 Юани (CNY)</option>
+                <option value="ton">💎 TON</option>
+                <option value="btc">🪙 Bitcoin (BTC)</option>
+            </select>
+
+            <input type="number" id="transfer-amount" placeholder="Сумма перевода">
+            <label>Причина или сообщение:</label>
+            <input type="text" id="transfer-reason" placeholder="Например: За работу / Подарок">
+            <button class="btn-danger" onclick="transferMoney()">Совершить перевод и создать код ➡️</button>
+            
+            <!-- Локальная плашка для кода прямого перевода -->
+            <div class="local-chek-box" id="chek-box-transfer">
+                <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Передайте этот код получателю:</span>
+                <strong id="chek-text-transfer">КОД</strong>
+            </div>
+        </div>
+
+        <!-- 🎁 СОЗДАНИЕ МНОГОРАЗОВОГО ЧЕКА -->
+        <div style="background: #eff6ff; padding: 15px; border-radius: 14px; border: 1px solid #bfdbfe; margin-bottom: 20px;">
+            <h4>🎁 Создать многоразовый конверт (Разделить сумму)</h4>
+            <label>Общий пул (в единицах вашей осн. валюты):</label>
+            <input type="number" id="multi-total-pool" placeholder="Например: 500">
+            <label>Количество активаций:</label>
+            <input type="number" id="multi-activations-limit" placeholder="Например: 5">
+            <label>Причина или пожелание:</label>
+            <input type="text" id="multi-custom-reason" placeholder="Например: Победителю викторины">
+            <button class="btn-alt" onclick="createMultiSplitCode()">Создать многоразовый код 🎁</button>
+            
+            <!-- Локальная плашка для многоразового кода -->
+            <div class="local-chek-box" id="chek-box-multi">
+                <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Многоразовый код на активации:</span>
+                <strong id="chek-text-multi">КОД</strong>
+            </div>
+        </div>
+
+        <!-- ИСТОРИЯ ТРАНЗАКЦИЙ -->
         <div class="history-wrapper">
             <h4 id="history-title">📋 История операций</h4>
             <input type="text" id="search-tx-id" class="search-input" placeholder="🔍 Поиск по коду (ID) транзакции..." oninput="updateUI()">

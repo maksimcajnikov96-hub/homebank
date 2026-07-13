@@ -1,12 +1,32 @@
 const CLOUD_API_URL = "https://api.jsonbin.io/v3/b/66184a7eacd3cb34a83696fb"; 
 
+// Фиксированные курсы валют К БАЗОВЫМ МОНЕТАМ
+const RATES = {
+    coins: 1.00,
+    usd: 67.70,
+    eur: 76.60,
+    cny: 13.00,
+    ton: 113.00,
+    btc: 1000000.00
+};
+
+const CURRENCY_LABELS = {
+    coins: "🪙 Монетки",
+    usd: "💵 Доллар (USD)",
+    eur: "💶 Евро (EUR)",
+    cny: "🇨🇳 Юань (CNY)",
+    ton: "💎 Тонкоин (TON)",
+    btc: "🪙 Биткоин (BTC)"
+};
+
 function getDefaultData() {
     return {
         accounts: {
-            "77777777": { owner: "Управление Банка (Казна) 👑", balance: 500000, cvv: "8354", formattedNumber: "7777 7777" },
-            "21535477": { owner: "Центральный расчетный счет", balance: 1000, cvv: "111", formattedNumber: "2153 5477" }
+            "77777777": { owner: "Управление Банка (Казна) 👑", baseCurrency: "coins", balance: 500000, usd: 10000, eur: 5000, cny: 50000, ton: 5000, btc: 5, cvv: "8354", formattedNumber: "7777 7777" },
+            "21535477": { owner: "Центральный расчетный счет", baseCurrency: "coins", balance: 1000, usd: 0, eur: 0, cny: 0, ton: 0, btc: 0, cvv: "111", formattedNumber: "2153 5477" }
         },
-        logs: []
+        logs: [],
+        multiCodes: {}
     };
 }
 
@@ -19,6 +39,28 @@ function safeGetItem(key) {
 
 function safeSetItem(key, value) {
     try { localStorage.setItem(key, value); } catch (e) {}
+}
+
+function encodeTextToDigits(text) {
+    let output = "";
+    for (let i = 0; i < text.length; i++) {
+        let code = text.charCodeAt(i).toString();
+        output += code.padStart(5, '0');
+    }
+    return output;
+}
+
+function decodeDigitsToText(digits) {
+    if (!digits) return "";
+    let output = "";
+    for (let i = 0; i < digits.length; i += 5) {
+        let chunk = digits.substring(i, i + 5);
+        let charCode = parseInt(chunk, 10);
+        if (!isNaN(charCode)) {
+            output += String.fromCharCode(charCode);
+        }
+    }
+    return output;
 }
 
 async function loadBankData() {
@@ -36,13 +78,21 @@ async function loadBankData() {
             let resData = await response.json();
             if (resData.record && resData.record.accounts) {
                 bankDatabase = resData.record;
+                if (!bankDatabase.multiCodes) bankDatabase.multiCodes = {};
+                
+                for (let acc in bankDatabase.accounts) {
+                    let a = bankDatabase.accounts[acc];
+                    if (!a.baseCurrency) a.baseCurrency = "coins";
+                    if (a.usd === undefined) a.usd = 0;
+                    if (a.eur === undefined) a.eur = 0;
+                    if (a.cny === undefined) a.cny = 0;
+                    if (a.ton === undefined) a.ton = 0;
+                    if (a.btc === undefined) a.btc = 0;
+                }
                 safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
             }
         }
     } catch (e) { console.log("Автономный режим"); }
-    
-    if (!bankDatabase.accounts["77777777"]) bankDatabase.accounts["77777777"] = getDefaultData().accounts["77777777"];
-    if (!bankDatabase.accounts["21535477"]) bankDatabase.accounts["21535477"] = getDefaultData().accounts["21535477"];
 }
 
 async function saveBankData() {
@@ -98,6 +148,7 @@ function switchZone(zone) {
 
 async function createAccount() {
     const nameInput = document.getElementById('reg-name').value.trim();
+    const baseCurrency = document.getElementById('reg-base-currency').value;
     const cvvInput = document.getElementById('reg-custom-cvv').value.trim().replace(/\s+/g, '');
     
     if (nameInput === "") { alert("Введите ФИО!"); return; }
@@ -108,13 +159,13 @@ async function createAccount() {
     
     await loadBankData();
     bankDatabase.accounts[cleanNumber] = { 
-        owner: nameInput, balance: 500, cvv: cvvInput, formattedNumber: formatted
+        owner: nameInput, baseCurrency: baseCurrency, balance: 500, usd: 0, eur: 0, cny: 0, ton: 0, btc: 0, cvv: cvvInput, formattedNumber: formatted
     };
     
-    addTransactionToLog("SYS", "00000000", cleanNumber, 500, "Регистрация счета");
+    addTransactionToLog("SYS", "00000000", cleanNumber, 500, "Регистрация расчетного счета");
     await saveBankData();
     
-    alert(`🎉 Счет открыт: ${formatted}`);
+    alert(`🎉 Расчетный счет открыт!`);
     switchZone('login');
     document.getElementById('login-number').value = formatted;
     document.getElementById('login-cvv').value = cvvInput;
@@ -127,7 +178,7 @@ async function loginAccount() {
     await loadBankData();
 
     if (!bankDatabase.accounts[numberInput] || bankDatabase.accounts[numberInput].cvv !== cvvInput) {
-        alert("Неверные данные! Проверьте номер счета и CVV."); return;
+        alert("Неверные данные!"); return;
     }
     
     safeSetItem('activeBankSession', numberInput);
@@ -136,21 +187,48 @@ async function loginAccount() {
 }
 
 function autoLogin(accountNumber) {
-    let user = bankDatabase.accounts[accountNumber];
+    let cleanAccountNumber = accountNumber.toString().trim().replace(/\s+/g, '');
+    let user = bankDatabase.accounts[cleanAccountNumber];
     if (!user) return;
+    
     document.getElementById('display-name').innerText = user.owner;
-    document.getElementById('display-number').innerText = user.formattedNumber || accountNumber;
+    document.getElementById('display-number').innerText = user.formattedNumber || cleanAccountNumber;
     document.getElementById('display-cvv').innerText = user.cvv;
+    
+    document.getElementById('user-change-currency').value = user.baseCurrency || "coins";
+    
     document.getElementById('login-zone').style.display = "none";
     document.getElementById('account-zone').style.display = "block";
-    document.getElementById('generated-chek-box').style.display = "none";
     
-    if (myAccountNumber === "77777777") {
+    // Скрываем все плашки кодов при логине
+    document.getElementById('chek-box-admin').style.display = "none";
+    document.getElementById('chek-box-transfer').style.display = "none";
+    document.getElementById('chek-box-multi').style.display = "none";
+    
+    if (cleanAccountNumber === "77777777") {
         document.getElementById('history-title').innerText = "📋 Глобальный audit транзакций (Казна)";
+        document.getElementById('admin-panel').style.display = "block"; 
     } else {
         document.getElementById('history-title').innerText = "📋 История ваших операций";
+        document.getElementById('admin-panel').style.display = "none"; 
     }
+    updateExchangePreview();
     updateUI();
+}
+
+async function changeUserCurrency() {
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let newCurrency = document.getElementById('user-change-currency').value;
+    
+    await loadBankData();
+    if (bankDatabase.accounts[myCleanNumber]) {
+        bankDatabase.accounts[myCleanNumber].baseCurrency = newCurrency;
+        await saveBankData();
+        
+        updateExchangePreview();
+        updateUI();
+        alert(`🔄 Валюта вашего счета изменена на: ${CURRENCY_LABELS[newCurrency]}`);
+    }
 }
 
 function logout() {
@@ -158,41 +236,223 @@ function logout() {
     myAccountNumber = "";
     document.getElementById('account-zone').style.display = "none";
     document.getElementById('login-zone').style.display = "block";
+    document.getElementById('admin-panel').style.display = "none";
 }
 
-// ПЕРЕВОД: АБСОЛЮТНО УСТОЙЧИВ К ЛЮБЫМ ПРОБЕЛАМ ИЗ КЛАВИАТУРЫ ТЕЛЕФОНА
-async function transferMoney() {
-    let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
-    const amountInput = document.getElementById('transfer-amount');
-    const amount = parseInt(amountInput.value);
+function updateExchangePreview() {
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let user = bankDatabase.accounts[myCleanNumber];
+    let baseCurr = user ? (user.baseCurrency || "coins") : "coins";
+
+    const direction = document.getElementById('exchange-direction').value;
+    const amount = parseFloat(document.getElementById('exchange-input-amount').value) || 0;
+    const preview = document.getElementById('exchange-preview-text');
+    const ratesBox = document.getElementById('exchange-live-rates-box');
     
-    await loadBankData(); 
+    let userRate = RATES[baseCurr];
+    let showName = baseCurr.toUpperCase();
+    
+    ratesBox.innerHTML = `
+        📊 <b>Рыночные котировки в вашей валюте (${showName}):</b><br>
+        • 1 🪙 Монетка = ${(1 / userRate).toFixed(4)} ${showName}<br>
+        • 1 💵 Доллар (USD) = ${(RATES.usd / userRate).toFixed(2)} ${showName}<br>
+        • 1 💶 Евро (EUR) = ${(RATES.eur / userRate).toFixed(2)} ${showName}<br>
+        • 1 🇨🇳 Юань (CNY) = ${(RATES.cny / userRate).toFixed(2)} ${showName}<br>
+        • 1 💎 Тонкоин (TON) = ${(RATES.ton / userRate).toFixed(2)} ${showName}<br>
+        • 1 🪙 Биткоин (BTC) = ${(RATES.btc / userRate).toFixed(2)} ${showName}
+    `;
+
+    let result = 0;
+    if (direction === "coins_to_usd") result = amount / RATES.usd;
+    else if (direction === "usd_to_coins") result = amount * RATES.usd;
+    else if (direction === "coins_to_eur") result = amount / RATES.eur;
+    else if (direction === "eur_to_coins") result = amount * RATES.eur;
+    else if (direction === "coins_to_cny") result = amount / RATES.cny;
+    else if (direction === "cny_to_coins") result = amount * RATES.cny;
+    else if (direction === "coins_to_ton") result = amount / RATES.ton;
+    else if (direction === "ton_to_coins") result = amount * RATES.ton;
+    else if (direction === "coins_to_btc") result = amount / RATES.btc;
+    else if (direction === "btc_to_coins") result = amount * RATES.btc;
+    
+    preview.innerText = `Вы получите: ${result.toFixed(4)}`;
+}
+
+async function executeCurrencyExchange() {
+    const direction = document.getElementById('exchange-direction').value;
+    const amount = parseFloat(document.getElementById('exchange-input-amount').value);
     
     if (isNaN(amount) || amount <= 0) { alert("Укажите сумму!"); return; }
     
-    // Проверка существования счета по ОЧИЩЕННОМУ номеру
-    if (!bankDatabase.accounts[targetNumber]) { 
-        alert(`🔒 Ошибка! Расчетный счет [${targetNumber}] не найден в банковской базе.`); 
-        return; 
-    }
-    if (amount > bankDatabase.accounts[myAccountNumber].balance) { alert("Недостаточно средств!"); return; }
-    if (targetNumber === myAccountNumber) { alert("Нельзя переводить себе!"); return; }
+    await loadBankData();
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let user = bankDatabase.accounts[myCleanNumber];
     
-    bankDatabase.accounts[myAccountNumber].balance -= amount;
+    if (myCleanNumber !== "77777777") {
+        if (direction.startsWith("coins_") && user.balance < amount) { alert("Недостаточно монет 🪙!"); return; }
+        if (direction === "usd_to_coins" && (user.usd || 0) < amount) { alert("Недостаточно USD 💵!"); return; }
+        if (direction === "eur_to_coins" && (user.eur || 0) < amount) { alert("Недостаточно EUR 💶!"); return; }
+        if (direction === "cny_to_coins" && (user.cny || 0) < amount) { alert("Недостаточно CNY 🇨🇳!"); return; }
+        if (direction === "ton_to_coins" && (user.ton || 0) < amount) { alert("Недостаточно TON 💎!"); return; }
+        if (direction === "btc_to_coins" && (user.btc || 0) < amount) { alert("Недостаточно BTC 🪙!"); return; }
+    }
+    
+    let logMsg = "";
+    if (direction === "coins_to_usd") { user.balance -= amount; user.usd = (user.usd || 0) + (amount / RATES.usd); logMsg = `Эмиссия/Обмен: ${amount} 🪙 -> ${(amount / RATES.usd).toFixed(2)} USD`; }
+    else if (direction === "usd_to_coins") { user.usd -= amount; user.balance += (amount * RATES.usd); logMsg = `Эмиссия/Обмен: ${amount} USD -> ${(amount * RATES.usd).toFixed(2)} 🪙`; }
+    else if (direction === "coins_to_eur") { user.balance -= amount; user.eur = (user.eur || 0) + (amount / RATES.eur); logMsg = `Эмиссия/Обмен: ${amount} 🪙 -> ${(amount / RATES.eur).toFixed(2)} EUR`; }
+    else if (direction === "eur_to_coins") { user.eur -= amount; user.balance += (amount * RATES.eur); logMsg = `Эмиссия/Обмен: ${amount} EUR -> ${(amount * RATES.eur).toFixed(2)} 🪙`; }
+    else if (direction === "coins_to_cny") { user.balance -= amount; user.cny = (user.cny || 0) + (amount / RATES.cny); logMsg = `Эмиссия/Обмен: ${amount} 🪙 -> ${(amount / RATES.cny).toFixed(2)} CNY`; }
+    else if (direction === "cny_to_coins") { user.cny -= amount; user.balance += (amount * RATES.cny); logMsg = `Эмиссия/Обмен: ${amount} CNY -> ${(amount * RATES.cny).toFixed(2)} 🪙`; }
+    else if (direction === "coins_to_ton") { user.balance -= amount; user.ton = (user.ton || 0) + (amount / RATES.ton); logMsg = `Эмиссия/Обмен: ${amount} 🪙 -> ${(amount / RATES.ton).toFixed(2)} TON`; }
+    else if (direction === "ton_to_coins") { user.ton -= amount; user.balance += (amount * RATES.ton); logMsg = `Эмиссия/Обмен: ${amount} TON -> ${(amount * RATES.ton).toFixed(2)} 🪙`; }
+    else if (direction === "coins_to_btc") { user.balance -= amount; user.btc = (user.btc || 0) + (amount / RATES.btc); logMsg = `Эмиссия/Обмен: ${amount} 🪙 -> ${(amount / RATES.btc).toFixed(5)} BTC`; }
+    else if (direction === "btc_to_coins") { user.btc -= amount; user.balance += (amount * RATES.btc); logMsg = `Эмиссия/Обмен: ${amount} BTC -> ${(amount * RATES.btc).toFixed(2)} 🪙`; }
     
     let txId = Math.floor(1000 + Math.random() * 9000);
-    let secureToken = `TX-${txId}-${myAccountNumber}-${targetNumber}-${amount}`;
+    addTransactionToLog(txId, myCleanNumber, "EXCHANGE", amount, logMsg);
     
-    addTransactionToLog(txId, myAccountNumber, targetNumber, amount, "Чек выпущен (Ожидание)");
+    await saveBankData();
+    updateUI();
+    document.getElementById('exchange-input-amount').value = "";
+    updateExchangePreview();
+    alert("💱 Валютная операция успешно выполнена!");
+}
+
+// 💸 ОБНОВЛЕННЫЙ ПРЯМОЙ ПЕРЕВОД С ВЫБОРОМ ЛЮБОЙ ВАЛЮТЫ И ЛОКАЛЬНЫМ ОКНОМ
+async function transferMoney() {
+    let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
+    const amountInput = document.getElementById('transfer-amount');
+    const reasonInput = document.getElementById('transfer-reason');
+    const selectedCurrency = document.getElementById('transfer-currency').value; // НОВАЯ ВАЛЮТА ПЕРЕВОДА
+    
+    const amountInSelectedCurrency = parseFloat(amountInput.value);
+    let reason = reasonInput.value.trim();
+    
+    await loadBankData(); 
+    if (isNaN(amountInSelectedCurrency) || amountInSelectedCurrency <= 0) { alert("Укажите сумму!"); return; }
+    
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let sender = bankDatabase.accounts[myCleanNumber];
+    
+    // Переводим выбранную валюту перевода в системные базовые монетки ядра
+    let amountInCoins = myCleanNumber === "77777777" ? 0 : amountInSelectedCurrency * RATES[selectedCurrency];
+    
+    // Исключение для Банкира: ТЕБЕ можно переводить самому себе! Всем остальным — нет.
+    if (targetNumber === myCleanNumber && myCleanNumber !== "77777777") { 
+        alert("Нельзя переводить самому себе!"); 
+        return; 
+    }
+    
+    if (myCleanNumber !== "77777777" && amountInCoins > sender.balance) { alert("Недостаточно средств на основном балансе!"); return; }
+    
+    if (reason === "") { reason = "Перевод средств"; }
+    
+    // Снимаем монеты у всех, кроме тебя
+    if (myCleanNumber !== "77777777") {
+        sender.balance -= amountInCoins;
+    }
+    
+    let finalCoinsAmount = amountInSelectedCurrency * RATES[selectedCurrency];
+    let txId = Math.floor(1000 + Math.random() * 9000);
+    let cryptedReason = encodeTextToDigits(reason);
+    
+    // Формируем токен (внутри него всегда зашиты базовые монетки для безопасного зачисления)
+    let secureToken = `TX-${txId}-${myCleanNumber}-${targetNumber}-${Math.floor(finalCoinsAmount)}-${cryptedReason}`;
+    addTransactionToLog(txId, myCleanNumber, targetNumber, amountInSelectedCurrency, `Выпущен чек (${selectedCurrency.toUpperCase()}): ${reason}`);
     
     await saveBankData(); 
     updateUI();
     
-    document.getElementById('chek-text-code').innerText = secureToken;
-    document.getElementById('generated-chek-box').style.display = "block";
+    // Выводим код в ЛОКАЛЬНОЕ окно прямого перевода
+    document.getElementById('chek-text-transfer').innerText = secureToken;
+    document.getElementById('chek-box-transfer').style.display = "block";
     
-    amountInput.value = ""; document.getElementById('target-account-number').value = "";
-    alert(`🎉 Код перевода успешно создан! Передайте его получателю.`);
+    amountInput.value = ""; reasonInput.value = ""; document.getElementById('target-account-number').value = "";
+    alert(`🎉 Код перевода в валюте ${selectedCurrency.toUpperCase()} успешно создан!`);
+}
+
+// 🚫 ШТРАФЫ: С КОДОМ ВНУТРИ АДМИН-ПАНЕЛИ
+async function createAdminDebitCode() {
+    let targetNumber = document.getElementById('admin-target-account').value.trim().replace(/\s+/g, '');
+    const amountInput = document.getElementById('admin-debit-amount');
+    const reasonInput = document.getElementById('admin-debit-reason');
+    
+    const amountInAdminCurrency = parseFloat(amountInput.value);
+    let reason = reasonInput.value.trim();
+    
+    await loadBankData();
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    if (myCleanNumber !== "77777777") { alert("🔒 Отказано в доступе!"); return; }
+    if (isNaN(amountInAdminCurrency) || amountInAdminCurrency <= 0) { alert("Укажите сумму!"); return; }
+    
+    let adminBase = bankDatabase.accounts["77777777"].baseCurrency || "coins";
+    let amountInCoins = amountInAdminCurrency * RATES[adminBase];
+    
+    if (reason === "") { reason = "Штраф"; }
+    let txId = Math.floor(1000 + Math.random() * 9000);
+    let cryptedReason = encodeTextToDigits(reason);
+    
+    let secureToken = `TX-${txId}-DEBIT-${targetNumber}-${Math.floor(amountInCoins)}-${cryptedReason}`;
+    addTransactionToLog(txId, targetNumber, "00000000", amountInAdminCurrency, `Выписан ордер списания: ${reason}`);
+    
+    await saveBankData();
+    updateUI();
+    
+    // Выводим код в ЛОКАЛЬНОЕ окно админки
+    document.getElementById('chek-text-admin').innerText = secureToken;
+    document.getElementById('chek-box-admin').style.display = "block";
+    
+    amountInput.value = ""; reasonInput.value = ""; document.getElementById('admin-target-account').value = "";
+    alert(`🚫 Штрафной ордер успешно выписан!`);
+}
+
+// 🎁 КОНВЕРТЫ: С КОДОМ ВНУТРИ БЛОКА КОНВЕРТОВ
+async function createMultiSplitCode() {
+    const poolInput = document.getElementById('multi-total-pool');
+    const limitInput = document.getElementById('multi-activations-limit');
+    const reasonInput = document.getElementById('multi-custom-reason');
+    
+    const totalPoolInUserCurrency = parseFloat(poolInput.value);
+    const limit = parseInt(limitInput.value);
+    let reason = reasonInput.value.trim();
+    
+    await loadBankData();
+    if (isNaN(totalPoolInUserCurrency) || totalPoolInUserCurrency <= 0) { alert("Укажите сумму!"); return; }
+    if (isNaN(limit) || limit <= 0) { alert("Укажите количество активаций!"); return; }
+    
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let user = bankDatabase.accounts[myCleanNumber];
+    let userBase = user.baseCurrency || "coins";
+    
+    let totalPoolInCoins = totalPoolInUserCurrency * RATES[userBase];
+    if (myCleanNumber !== "77777777" && totalPoolInCoins > user.balance) {
+        alert("Недостаточно средств!"); return;
+    }
+    
+    const amountPerActivationInCoins = Math.floor(totalPoolInCoins / limit);
+    if (amountPerActivationInCoins <= 0) { alert("Слишком маленький пул монет!"); return; }
+    
+    if (reason === "") { reason = "Конверт с монетами"; }
+    if (myCleanNumber !== "77777777") { user.balance -= totalPoolInCoins; }
+    
+    let txId = Math.floor(1000 + Math.random() * 9000);
+    let cryptedReason = encodeTextToDigits(reason);
+    
+    let secureToken = `TX-${txId}-MULTI-${limit}-${amountPerActivationInCoins}-${cryptedReason}`;
+    if (!bankDatabase.multiCodes) bankDatabase.multiCodes = {};
+    bankDatabase.multiCodes[txId.toString()] = [];
+    
+    addTransactionToLog(txId, myCleanNumber, "MULTI", totalPoolInUserCurrency, `Универсальный конверт: ${reason}`);
+    
+    await saveBankData();
+    updateUI();
+    
+    // Выводим код в ЛОКАЛЬНОЕ окно многоразовых кодов
+    document.getElementById('chek-text-multi').innerText = secureToken;
+    document.getElementById('chek-box-multi').style.display = "block";
+    
+    poolInput.value = ""; limitInput.value = ""; reasonInput.value = "";
+    alert(`🎁 Многоразовый конверт успешно создан!`);
 }
 
 async function redeemSecureCode() {
@@ -202,45 +462,60 @@ async function redeemSecureCode() {
     if (!token.startsWith("TX-")) { alert("Неверный формат кода!"); return; }
     
     let parts = token.split("-");
-    if (parts.length !== 5) { alert("Код поврежден!"); return; }
+    if (parts.length < 6) { alert("Код поврежден или устарел!"); return; }
     
     let txId = parts[1];
-    let senderAccount = parts[2];
-    let receiverAccount = parts[3];
-    let amount = parseInt(parts[4]);
+    let senderAccount = parts[2].trim().replace(/\s+/g, ''); 
+    let receiverAccount = parts[3].trim().replace(/\s+/g, ''); 
+    let amountInCoins = parseInt(parts[4]); 
+    let encryptedReason = parts[5].trim().replace(/\s+/g, ''); 
     
     await loadBankData();
+    let currentSessionClean = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let user = bankDatabase.accounts[currentSessionClean];
+    let userBase = user.baseCurrency || "coins";
+    
+    let decryptedReason = decodeDigitsToText(encryptedReason);
+    let amountInUserCurrency = amountInCoins / RATES[userBase];
 
-    // ЖЕЛЕЗНАЯ ПРОВЕРКА ПОЛУЧАТЕЛЯ
-    if (receiverAccount !== myAccountNumber) {
-        alert("🔒 Неверный счет получателя! Данный код выписан для другого расчетного счета. Активация отклонена.");
-        return;
-    }
-    
-    let activatedTokens = [];
-    try { activatedTokens = JSON.parse(safeGetItem('usedHomeBankTokens') || "[]"); } catch(e){}
-    
-    if (activatedTokens.includes(txId)) { alert("Этот код уже активирован!"); return; }
-    
-    bankDatabase.accounts[myAccountNumber].balance += amount;
-    
-    if (bankDatabase.logs) {
-        let currentLog = bankDatabase.logs.find(l => l.txId === txId.toString());
-        if (currentLog) {
-            currentLog.status = "Успешно зачислено по коду";
+    if (senderAccount !== "MULTI") {
+        if (receiverAccount !== currentSessionClean) { alert("🔒 Этот чек выписан на другое лицо."); return; }
+        
+        let activatedTokens = [];
+        try { activatedTokens = JSON.parse(safeGetItem('usedHomeBankTokens') || "[]"); } catch(e){}
+        if (activatedTokens.includes(txId)) { alert("Этот код уже активирован!"); return; }
+        
+        if (senderAccount === "DEBIT") {
+            user.balance -= amountInCoins;
+            addTransactionToLog(txId, currentSessionClean, "00000000", amountInUserCurrency, `Штраф списан за: ${decryptedReason}`);
+            alert(`⚠️ С вашего счёта списан штраф: ${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()}!`);
         } else {
-            addTransactionToLog(txId, senderAccount, myAccountNumber, amount, "Успешно зачислено по коду");
+            user.balance += amountInCoins;
+            addTransactionToLog(txId, senderAccount, currentSessionClean, amountInUserCurrency, `Зачислено: ${decryptedReason}`);
+            alert(`💰 Получено зачисление (+${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()})!`);
         }
+        activatedTokens.push(txId);
+        safeSetItem('usedHomeBankTokens', JSON.stringify(activatedTokens));
+        
+    } else {
+        let limit = parseInt(receiverAccount); 
+        if (!bankDatabase.multiCodes) bankDatabase.multiCodes = {};
+        if (!bankDatabase.multiCodes[txId]) bankDatabase.multiCodes[txId] = [];
+        let usersWhoRedeemed = bankDatabase.multiCodes[txId];
+        
+        if (usersWhoRedeemed.includes(currentSessionClean)) { alert("🔒 Вы уже брали долю из этого конверта!"); return; }
+        if (usersWhoRedeemed.length >= limit) { alert("🚫 Лимит активаций чека исчерпан!"); return; }
+        
+        user.balance += amountInCoins;
+        bankDatabase.multiCodes[txId].push(currentSessionClean);
+        
+        addTransactionToLog(txId, "MULTI", currentSessionClean, amountInUserCurrency, `Доля конверта: ${decryptedReason}`);
+        alert(`🎁 Вы забрали свою часть пула (+${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()})!`);
     }
-    
-    activatedTokens.push(txId);
-    safeSetItem('usedHomeBankTokens', JSON.stringify(activatedTokens));
     
     await saveBankData();
     inputField.value = "";
     updateUI();
-    
-    alert(`💰 Деньги успешно получены (+${amount} 🪙)!`);
 }
 
 function addTransactionToLog(txId, fromUser, toUser, amount, statusDescription) {
@@ -251,17 +526,29 @@ function addTransactionToLog(txId, fromUser, toUser, amount, statusDescription) 
         txId: txId.toString(),
         from: fromUser,
         to: toUser,
-        amount: amount,
+        amount: amount, 
         status: statusDescription,
         time: timestamp
     };
-    
     bankDatabase.logs.unshift(logItem);
 }
 
 function updateUI() {
-    if (bankDatabase.accounts[myAccountNumber]) {
-        document.getElementById('balance').innerText = bankDatabase.accounts[myAccountNumber].balance.toFixed(2);
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let user = bankDatabase.accounts[myCleanNumber];
+    
+    if (user) {
+        let baseCurr = user.baseCurrency || "coins";
+        let visualBalance = user.balance / RATES[baseCurr];
+        
+        document.getElementById('main-balance-render').innerText = `${visualBalance.toFixed(2)} ${baseCurr.toUpperCase()}`;
+        
+        document.getElementById('balance-coins').innerText = user.balance.toFixed(2);
+        document.getElementById('balance-usd').innerText = (user.usd || 0).toFixed(2);
+        document.getElementById('balance-eur').innerText = (user.eur || 0).toFixed(2);
+        document.getElementById('balance-cny').innerText = (user.cny || 0).toFixed(2);
+        document.getElementById('balance-ton').innerText = (user.ton || 0).toFixed(2);
+        document.getElementById('balance-btc').innerText = (user.btc || 0).toFixed(5);
     }
     
     let container = document.getElementById('history-list-container');
@@ -273,7 +560,7 @@ function updateUI() {
     let logs = bankDatabase.logs || [];
     
     logs.forEach(log => {
-        if (myAccountNumber === "77777777" || log.from === myAccountNumber || log.to === myAccountNumber) {
+        if (myCleanNumber === "77777777" || log.from === myCleanNumber || log.to === myCleanNumber) {
             if (searchQuery !== "" && !log.txId.includes(searchQuery)) { return; }
             
             hasLogs = true;
@@ -283,10 +570,16 @@ function updateUI() {
             let nameFrom = bankDatabase.accounts[log.from] ? bankDatabase.accounts[log.from].owner : log.from;
             let nameTo = bankDatabase.accounts[log.to] ? bankDatabase.accounts[log.to].owner : log.to;
             
+            let isDebitTx = log.status.includes('Штраф') || log.status.includes('ордер') || log.status.includes('списан');
+            let isExchange = log.to === "EXCHANGE";
+            
+            let color = "#10b981"; 
+            if (isDebitTx) color = "#ef4444"; 
+            if (isExchange) color = "#3b82f6"; 
+            
             item.innerHTML = `
                 [${log.time}] <span class="tx-id">Транзакция: #${log.txId}</span><br>
-                Отправитель: <b>${nameFrom}</b> -> Получатель: <b>${nameTo}</b><br>
-                Сумма: <b style="color:#10b981;">${log.amount} 🪙</b> | Статус: <i>${log.status}</i>
+                ${isExchange ? `Действие: <b>${log.status}</b>` : `Отправитель: <b>${nameFrom}</b> -> Получатель: <b>${nameTo}</b><br>Параметры: <b style="color:${color};">${log.amount} ед.</b> | Статус: <i>${log.status}</i>`}
             `;
             container.appendChild(item);
         }
