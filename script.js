@@ -126,7 +126,7 @@ function stopQRScanner() {
     }
 }
 
-// ЗАГРУЗКА ИЗ ОБЛАКА
+// ПОЛНОЕ СКАЧИВАНИЕ ИЗ ОБЛАКА
 async function loadBankData() {
     let localData = safeGetItem('homeBankGlobalData');
     if (localData) {
@@ -157,8 +157,52 @@ async function loadBankData() {
     } catch (e) { console.log("Автономный режим"); }
 }
 
-// ОТПРАВКА В ОБЛАКО
+// БЕЗОПАСНЫЙ ПУШ В ОБЛАКО (СЛИЯНИЕ ДАННЫХ ПЕРЕД ЗАПИСЬЮ)
 async function saveBankData() {
+    let currentSessionClean = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let localUserData = bankDatabase.accounts[currentSessionClean] ? JSON.parse(JSON.stringify(bankDatabase.accounts[currentSessionClean])) : null;
+    let localLogs = bankDatabase.logs ? JSON.parse(JSON.stringify(bankDatabase.logs)) : [];
+    let localMultiCodes = bankDatabase.multiCodes ? JSON.parse(JSON.stringify(bankDatabase.multiCodes)) : {};
+
+    try {
+        // 1. Скачиваем самую свежую версию из облака прямо перед отправкой
+        const response = await fetch(CLOUD_API_URL + "/latest", {
+            method: "GET",
+            headers: { "X-Master-Key": "$2b$10$P1W7p2S4v9zG1u.vA7vTeO6HwNf02Bq2V3sW9Xh7h1gXJ9yB7k8D6" }
+        });
+        
+        if (response.ok) {
+            let cloudRes = await response.json();
+            if (cloudRes.record && cloudRes.record.accounts) {
+                let cloudDatabase = cloudRes.record;
+
+                // 2. Интегрируем наши локальные изменения в свежую базу облака
+                if (localUserData) {
+                    cloudDatabase.accounts[currentSessionClean] = localUserData;
+                }
+                
+                // Объединяем логи (чтобы новые строчки логов не затирали чужие)
+                let freshLogs = cloudDatabase.logs || [];
+                localLogs.forEach(localLog => {
+                    if (!freshLogs.some(cloudLog => cloudLog.txId === localLog.txId)) {
+                        freshLogs.unshift(localLog);
+                    }
+                });
+                cloudDatabase.logs = freshLogs;
+
+                // Объединяем многоразовые коды пулов
+                if (!cloudDatabase.multiCodes) cloudDatabase.multiCodes = {};
+                for (let codeId in localMultiCodes) {
+                    cloudDatabase.multiCodes[codeId] = localMultiCodes[codeId];
+                }
+
+                // Переключаем рабочую базу на объединённую
+                bankDatabase = cloudDatabase;
+            }
+        }
+    } catch (e) { console.log("Ошибка слияния с облаком, сохраняем локально"); }
+
+    // 3. Отправляем финальный объединённый вариант в облако
     safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
     try {
         await fetch(CLOUD_API_URL, {
@@ -169,29 +213,13 @@ async function saveBankData() {
             },
             body: JSON.stringify(bankDatabase)
         });
-    } catch (e) { console.log("Ошибка сети"); }
+    } catch (e) { console.log("Ошибка отправки сети"); }
 }
 
-// 🔥 КРИТИЧЕСКИЙ ФИКС: УМНАЯ СИНХРОНИЗАЦИЯ ПО КНОПКЕ ОБНОВЛЕНИЯ ДЛЯ РАБОТЫ НА НЕСКОЛЬКИХ УСТРОЙСТВАХ
+// УМНАЯ СИНХРОНИЗАЦИЯ ПО КНОПКЕ ОБНОВЛЕНИЯ
 async function manualCloudRefresh() {
-    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
-    let localUserCopy = null;
-    
-    // 1. Сохраняем то, что сейчас находится локально на экране этого устройства
-    if (bankDatabase.accounts && bankDatabase.accounts[myCleanNumber]) {
-        localUserCopy = JSON.parse(JSON.stringify(bankDatabase.accounts[myCleanNumber]));
-    }
-    
-    // 2. Скачиваем свежую глобальную базу данных, в которой могут быть изменения от других игроков
+    // Просто скачиваем свежайшие данные. saveBankData не вызываем, чтобы не перетереть чужие балансы холостым пушем.
     await loadBankData();
-    
-    // 3. Сливаем данные: если на этом устройстве была изменена базовая валюта, переносим её в облачную копию
-    if (localUserCopy && bankDatabase.accounts[myCleanNumber]) {
-        bankDatabase.accounts[myCleanNumber].baseCurrency = localUserCopy.baseCurrency;
-    }
-    
-    // 4. Пушим объединённое состояние обратно в облако и перерисовываем экран
-    await saveBankData();
     updateUI();
 }
 
