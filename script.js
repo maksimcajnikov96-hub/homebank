@@ -200,7 +200,6 @@ function autoLogin(accountNumber) {
     document.getElementById('login-zone').style.display = "none";
     document.getElementById('account-zone').style.display = "block";
     
-    // Скрываем все плашки кодов при логине
     document.getElementById('chek-box-admin').style.display = "none";
     document.getElementById('chek-box-transfer').style.display = "none";
     document.getElementById('chek-box-multi').style.display = "none";
@@ -318,12 +317,11 @@ async function executeCurrencyExchange() {
     alert("💱 Валютная операция успешно выполнена!");
 }
 
-// 💸 ОБНОВЛЕННЫЙ ПРЯМОЙ ПЕРЕВОД С ВЫБОРОМ ЛЮБОЙ ВАЛЮТЫ И ЛОКАЛЬНЫМ ОКНОМ
 async function transferMoney() {
     let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('transfer-amount');
     const reasonInput = document.getElementById('transfer-reason');
-    const selectedCurrency = document.getElementById('transfer-currency').value; // НОВАЯ ВАЛЮТА ПЕРЕВОДА
+    const selectedCurrency = document.getElementById('transfer-currency').value; 
     
     const amountInSelectedCurrency = parseFloat(amountInput.value);
     let reason = reasonInput.value.trim();
@@ -334,20 +332,18 @@ async function transferMoney() {
     let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
     let sender = bankDatabase.accounts[myCleanNumber];
     
-    // Переводим выбранную валюту перевода в системные базовые монетки ядра
     let amountInCoins = myCleanNumber === "77777777" ? 0 : amountInSelectedCurrency * RATES[selectedCurrency];
     
-    // Исключение для Банкира: ТЕБЕ можно переводить самому себе! Всем остальным — нет.
+    // ЭКСКЛЮЗИВНЫЙ ФИКС: Для тебя (Казны) блокировка перевода самому себе полностью отключена!
     if (targetNumber === myCleanNumber && myCleanNumber !== "77777777") { 
         alert("Нельзя переводить самому себе!"); 
         return; 
     }
     
-    if (myCleanNumber !== "77777777" && amountInCoins > sender.balance) { alert("Недостаточно средств на основном балансе!"); return; }
+    if (myCleanNumber !== "77777777" && amountInCoins > sender.balance) { alert("Недостаточно средств!"); return; }
     
     if (reason === "") { reason = "Перевод средств"; }
     
-    // Снимаем монеты у всех, кроме тебя
     if (myCleanNumber !== "77777777") {
         sender.balance -= amountInCoins;
     }
@@ -356,14 +352,12 @@ async function transferMoney() {
     let txId = Math.floor(1000 + Math.random() * 9000);
     let cryptedReason = encodeTextToDigits(reason);
     
-    // Формируем токен (внутри него всегда зашиты базовые монетки для безопасного зачисления)
     let secureToken = `TX-${txId}-${myCleanNumber}-${targetNumber}-${Math.floor(finalCoinsAmount)}-${cryptedReason}`;
     addTransactionToLog(txId, myCleanNumber, targetNumber, amountInSelectedCurrency, `Выпущен чек (${selectedCurrency.toUpperCase()}): ${reason}`);
     
     await saveBankData(); 
     updateUI();
     
-    // Выводим код в ЛОКАЛЬНОЕ окно прямого перевода
     document.getElementById('chek-text-transfer').innerText = secureToken;
     document.getElementById('chek-box-transfer').style.display = "block";
     
@@ -371,7 +365,6 @@ async function transferMoney() {
     alert(`🎉 Код перевода в валюте ${selectedCurrency.toUpperCase()} успешно создан!`);
 }
 
-// 🚫 ШТРАФЫ: С КОДОМ ВНУТРИ АДМИН-ПАНЕЛИ
 async function createAdminDebitCode() {
     let targetNumber = document.getElementById('admin-target-account').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('admin-debit-amount');
@@ -398,7 +391,6 @@ async function createAdminDebitCode() {
     await saveBankData();
     updateUI();
     
-    // Выводим код в ЛОКАЛЬНОЕ окно админки
     document.getElementById('chek-text-admin').innerText = secureToken;
     document.getElementById('chek-box-admin').style.display = "block";
     
@@ -406,7 +398,6 @@ async function createAdminDebitCode() {
     alert(`🚫 Штрафной ордер успешно выписан!`);
 }
 
-// 🎁 КОНВЕРТЫ: С КОДОМ ВНУТРИ БЛОКА КОНВЕРТОВ
 async function createMultiSplitCode() {
     const poolInput = document.getElementById('multi-total-pool');
     const limitInput = document.getElementById('multi-activations-limit');
@@ -447,7 +438,6 @@ async function createMultiSplitCode() {
     await saveBankData();
     updateUI();
     
-    // Выводим код в ЛОКАЛЬНОЕ окно многоразовых кодов
     document.getElementById('chek-text-multi').innerText = secureToken;
     document.getElementById('chek-box-multi').style.display = "block";
     
