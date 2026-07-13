@@ -21,7 +21,7 @@ const CURRENCY_LABELS = {
 
 let bankDatabase = getDefaultData();
 let myAccountNumber = ""; 
-let html5QrScanner = null; // Глобальный объект сканера камер
+let html5QrScanner = null;
 
 function getDefaultData() {
     return {
@@ -64,10 +64,9 @@ function decodeDigitsToText(digits) {
     return output;
 }
 
-// ФУНКЦИЯ ДЛЯ ГЕНЕРАЦИИ ГРАФИЧЕСКОГО QR КОДА
 function generateQR(containerId, text) {
     const container = document.getElementById(containerId);
-    container.innerHTML = ""; // Стираем старый QR-код
+    container.innerHTML = ""; 
     new QRCode(container, {
         text: text,
         width: 160,
@@ -78,27 +77,38 @@ function generateQR(containerId, text) {
     });
 }
 
-// ФУНКЦИИ МОБИЛЬНОГО СКАНИРОВАНИЯ ЧЕРЕЗ КАМЕРУ
 function startQRScanner() {
     document.getElementById('scanner-modal').style.display = "flex";
-    
     html5QrScanner = new Html5Qrcode("qr-reader");
     const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-        // Как только код считан: подставляем его в инпут и гасим сканер
-        document.getElementById('coupon-code-input').value = decodedText;
         stopQRScanner();
-        // Сразу запускаем функцию активации для удобства
+        let token = decodedText.trim().replace(/\s+/g, '');
+        if (!token.startsWith("TX-")) { alert("❌ Неверный формат QR-кода!"); return; }
+        
+        let parts = token.split("-");
+        let senderAccount = parts[2] ? parts[2].trim() : "";
+        let amountInCoins = parts[4] ? parseInt(parts[4]) : 0;
+        let encryptedReason = parts[5] ? parts[5].trim() : "";
+        
+        let user = bankDatabase.accounts[myAccountNumber];
+        let userBase = user ? (user.baseCurrency || "coins") : "coins";
+        let amountInUserCurrency = amountInCoins / RATES[userBase];
+        let decryptedReason = decodeDigitsToText(encryptedReason);
+
+        if (senderAccount === "DEBIT") {
+            let confirmPay = confirm(`⚠️ ОБНАРУЖЕН ШТРАФНОЙ ОРДЕР!\n\nСумма к оплате: ${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()}\nПричина: ${decryptedReason}\n\nВы действительно хотите оплатить этот штраф?`);
+            if (!confirmPay) { alert("Оплата штрафа отменена пользователем."); return; }
+        }
+
+        document.getElementById('coupon-code-input').value = token;
         redeemSecureCode();
     };
     
     const config = { fps: 15, qrbox: { width: 250, height: 250 } };
-    
-    // Запускаем заднюю камеру (environment) смартфона
     html5QrScanner.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
     .catch((err) => {
-        console.log("Ошибка камеры, пробуем запустить стандартную");
         html5QrScanner.start({ facingMode: "user" }, config, qrCodeSuccessCallback).catch(e => {
-            alert("Не удалось запустить камеру! Введите код вручную.");
+            alert("Не удалось запустить камеру!");
             stopQRScanner();
         });
     });
@@ -116,6 +126,7 @@ function stopQRScanner() {
     }
 }
 
+// ЗАГРУЗКА ИЗ ОБЛАКА
 async function loadBankData() {
     let localData = safeGetItem('homeBankGlobalData');
     if (localData) {
@@ -131,12 +142,22 @@ async function loadBankData() {
             if (resData.record && resData.record.accounts) {
                 bankDatabase = resData.record;
                 if (!bankDatabase.multiCodes) bankDatabase.multiCodes = {};
+                for (let acc in bankDatabase.accounts) {
+                    let a = bankDatabase.accounts[acc];
+                    if (!a.baseCurrency) a.baseCurrency = "coins";
+                    if (a.usd === undefined) a.usd = 0;
+                    if (a.eur === undefined) a.eur = 0;
+                    if (a.cny === undefined) a.cny = 0;
+                    if (a.ton === undefined) a.ton = 0;
+                    if (a.btc === undefined) a.btc = 0;
+                }
                 safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
             }
         }
     } catch (e) { console.log("Автономный режим"); }
 }
 
+// ОТПРАВКА В ОБЛАКО
 async function saveBankData() {
     safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
     try {
@@ -151,10 +172,27 @@ async function saveBankData() {
     } catch (e) { console.log("Ошибка сети"); }
 }
 
+// 🔥 КРИТИЧЕСКИЙ ФИКС: УМНАЯ СИНХРОНИЗАЦИЯ ПО КНОПКЕ ОБНОВЛЕНИЯ ДЛЯ РАБОТЫ НА НЕСКОЛЬКИХ УСТРОЙСТВАХ
 async function manualCloudRefresh() {
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let localUserCopy = null;
+    
+    // 1. Сохраняем то, что сейчас находится локально на экране этого устройства
+    if (bankDatabase.accounts && bankDatabase.accounts[myCleanNumber]) {
+        localUserCopy = JSON.parse(JSON.stringify(bankDatabase.accounts[myCleanNumber]));
+    }
+    
+    // 2. Скачиваем свежую глобальную базу данных, в которой могут быть изменения от других игроков
     await loadBankData();
+    
+    // 3. Сливаем данные: если на этом устройстве была изменена базовая валюта, переносим её в облачную копию
+    if (localUserCopy && bankDatabase.accounts[myCleanNumber]) {
+        bankDatabase.accounts[myCleanNumber].baseCurrency = localUserCopy.baseCurrency;
+    }
+    
+    // 4. Пушим объединённое состояние обратно в облако и перерисовываем экран
+    await saveBankData();
     updateUI();
-    alert("🔄 Синхронизировано!");
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -192,6 +230,10 @@ function autoLogin(accountNumber) {
     
     document.getElementById('login-zone').style.display = "none";
     document.getElementById('account-zone').style.display = "block";
+    
+    document.getElementById('chek-box-admin').style.display = "none";
+    document.getElementById('chek-box-transfer').style.display = "none";
+    document.getElementById('chek-box-multi').style.display = "none";
     
     if (cleanAccountNumber === "77777777") {
         document.getElementById('history-title').innerText = "📋 Глобальный audit транзакций (Казна)";
@@ -331,7 +373,6 @@ async function transferMoney() {
     await saveBankData(); 
     updateUI();
     
-    // РЕНДЕР ТЕКСТА И QR ДЛЯ ПЕРЕВОДА
     document.getElementById('chek-text-transfer').innerText = secureToken;
     document.getElementById('chek-box-transfer').style.display = "block";
     generateQR("qr-transfer-container", secureToken);
@@ -363,7 +404,6 @@ async function createAdminDebitCode() {
     await saveBankData();
     updateUI();
     
-    // РЕНДЕР ТЕКСТА И QR ДЛЯ АДМИНКИ
     document.getElementById('chek-text-admin').innerText = secureToken;
     document.getElementById('chek-box-admin').style.display = "block";
     generateQR("qr-admin-container", secureToken);
@@ -406,7 +446,6 @@ async function createMultiSplitCode() {
     await saveBankData();
     updateUI();
     
-    // РЕНДЕР ТЕКСТА И QR ДЛЯ МНОГОРАЗОВЫХ КОДОВ
     document.getElementById('chek-text-multi').innerText = secureToken;
     document.getElementById('chek-box-multi').style.display = "block";
     generateQR("qr-multi-container", secureToken);
@@ -445,7 +484,7 @@ async function redeemSecureCode() {
         if (senderAccount === "DEBIT") {
             user.balance -= amountInCoins;
             addTransactionToLog(txId, currentSessionClean, "00000000", amountInUserCurrency, `Штраф списан за: ${decryptedReason}`);
-            alert(`⚠️ Списан штраф: ${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()}!`);
+            alert(`⚠️ Штраф успешно оплачен! Списано: ${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()}`);
         } else {
             user.balance += amountInCoins;
             addTransactionToLog(txId, senderAccount, currentSessionClean, amountInUserCurrency, `Зачислено: ${decryptedReason}`);

@@ -43,17 +43,22 @@
         .tx-id { font-family: monospace; color: #3b82f6; font-weight: bold; }
         .search-input { padding: 10px 14px; margin-bottom: 10px; font-size: 14px; border-radius: 8px; }
         
-        /* Окно сканера камер */
+        /* Всплывающий сканер */
         #scanner-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
         #scanner-container { background: white; padding: 15px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; }
         #qr-reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
+
+        /* Стиль для кнопки обновления рядом с балансом */
+        .balance-header-container { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 4px; }
+        .btn-refresh-mini { background: #10b981; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 16px; font-weight: bold; border: none; box-shadow: 0 2px 6px rgba(16,185,129,0.3); transition: transform 0.2s; }
+        .btn-refresh-mini:active { transform: scale(0.9); }
     </style>
 </head>
 <body>
 
     <h1>🏦 HomeBank Central</h1>
 
-    <!-- ОКНО МОБИЛЬНОГО СКАНЕРА (ВСПЛЫВАЮЩЕЕ) -->
+    <!-- ОКНО МОБИЛЬНОГО СКАНЕРА -->
     <div id="scanner-modal">
         <div id="scanner-container">
             <h4 style="margin-bottom: 10px;">📷 Наведите камеру на QR-код</h4>
@@ -118,10 +123,14 @@
             <button class="btn-alt" style="margin-top: 0; padding: 12px; width: 100%; font-size: 14px; background-color: #3b82f6;" onclick="changeUserCurrency()">Обновить валюту счета 🔄</button>
         </div>
 
-        <!-- КРУПНОЕ ОТОБРАЖЕНИЕ ГЛАВНОГО БАЛАНСА -->
+        <!-- КРУПНОЕ ОТОБРАЖЕНИЕ ГЛАВНОГО БАЛАНСА + КНОПКА ОБНОВЛЕНИЯ -->
         <div style="background: #f0fdf4; padding: 12px; border-radius: 12px; text-align: center; margin: 15px 0 15px 0; border: 1px solid #bbf7d0;">
             <span style="color: #15803d; font-size: 14px; font-weight: 500;">Ваш основной баланс:</span>
-            <div style="font-size: 28px; font-weight: 700; color: #10b981;" id="main-balance-render">0.00 COINS</div>
+            <div class="balance-header-container">
+                <div style="font-size: 26px; font-weight: 700; color: #10b981;" id="main-balance-render">0.00 COINS</div>
+                <!-- НОВАЯ КНОПКА ОБНОВЛЕНИЯ ВОЗЛЕ БАЛАНСА -->
+                <button class="btn-refresh-mini" onclick="manualCloudRefresh()" title="Обновить баланс">🔄</button>
+            </div>
         </div>
 
         <!-- МУЛЬТИВАЛЮТНАЯ СЕТКА ДОПОЛНИТЕЛЬНЫХ КОШЕЛЬКОВ -->
@@ -167,7 +176,7 @@
             <div class="local-chek-box" id="chek-box-admin">
                 <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Код штрафного ордера:</span>
                 <strong id="chek-text-admin">КОД</strong>
-                <div class="qr-output-zone" id="qr-admin-container"></div> <!-- Место для QR-кода -->
+                <div class="qr-output-zone" id="qr-admin-container"></div>
             </div>
         </div>
 
@@ -233,7 +242,7 @@
             <div class="local-chek-box" id="chek-box-transfer">
                 <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Передайте этот код или QR получателю:</span>
                 <strong id="chek-text-transfer">КОД</strong>
-                <div class="qr-output-zone" id="qr-transfer-container"></div> <!-- Место для QR-кода -->
+                <div class="qr-output-zone" id="qr-transfer-container"></div>
             </div>
         </div>
 
@@ -251,7 +260,7 @@
             <div class="local-chek-box" id="chek-box-multi">
                 <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">Многоразовый код на активации:</span>
                 <strong id="chek-text-multi">КОД</strong>
-                <div class="qr-output-zone" id="qr-multi-container"></div> <!-- Место для QR-кода -->
+                <div class="qr-output-zone" id="qr-multi-container"></div>
             </div>
         </div>
 
