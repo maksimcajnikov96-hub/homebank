@@ -95,6 +95,7 @@
             <option value="cny">🇨🇳 Юань (CNY)</option>
             <option value="ton">💎 Тонкоин (TON)</option>
             <option value="btc">🪙 Биткоин (BTC)</option>
+            <option value="saakovska">🏛 Saakovska</option>
         </select>
 
         <label>Придумайте CVV код безопасности (3-4 цифры):</label>
@@ -119,6 +120,7 @@
                 <option value="cny">🇨🇳 Юань (CNY)</option>
                 <option value="ton">💎 Тонкоин (TON)</option>
                 <option value="btc">🪙 Биткоин (BTC)</option>
+                <option value="saakovska">🏛 Saakovska</option>
             </select>
             <button class="btn-alt" style="margin-top: 0; padding: 12px; width: 100%; font-size: 14px; background-color: #3b82f6;" onclick="changeUserCurrency()">Обновить валюту счета 🔄</button>
         </div>
@@ -128,7 +130,7 @@
             <span style="color: #15803d; font-size: 14px; font-weight: 500;">Ваш основной баланс:</span>
             <div class="balance-header-container">
                 <div style="font-size: 26px; font-weight: 700; color: #10b981;" id="main-balance-render">0.00 COINS</div>
-                <!-- НОВАЯ КНОПКА ОБНОВЛЕНИЯ ВОЗЛЕ БАЛАНСА -->
+                <!-- КНОПКА ОБНОВЛЕНИЯ ВОЗЛЕ БАЛАНСА -->
                 <button class="btn-refresh-mini" onclick="manualCloudRefresh()" title="Обновить баланс">🔄</button>
             </div>
         </div>
@@ -158,6 +160,11 @@
             <div class="balance-card-mini">
                 <div style="color: #d97706; font-size: 11px;">Bitcoin 🪙</div>
                 <div class="amount" id="balance-btc">0.00</div>
+            </div>
+            <!-- ПОЛЕ ДЛЯ НОВОЙ ВАЛЮТЫ -->
+            <div class="balance-card-mini" style="grid-column: span 2; background: #fffbeb; border: 1px solid #fde68a;">
+                <div style="color: #b45309; font-size: 11px; font-weight: bold;">Saakovska (SAK) 🏛</div>
+                <div class="amount" id="balance-saakovska" style="color: #d97706; font-size: 16px;">0.0000</div>
             </div>
         </div>
 
@@ -200,6 +207,8 @@
                 <option value="ton_to_coins">💎 TON ➡️ Монеты 🪙</option>
                 <option value="coins_to_btc">🪙 Монеты ➡️ Bitcoin 🪙</option>
                 <option value="btc_to_coins">🪙 Bitcoin ➡️ Монеты 🪙</option>
+                <option value="coins_to_saakovska">🪙 Монеты ➡️ Saakovska (SAK) 🏛</option>
+                <option value="saakovska_to_coins">🏛 Saakovska (SAK) ➡️ Монеты 🪙</option>
             </select>
             
             <label>Сколько отдаёте:</label>
@@ -232,6 +241,7 @@
                 <option value="cny">🇨🇳 Юани (CNY)</option>
                 <option value="ton">💎 TON</option>
                 <option value="btc">🪙 Bitcoin (BTC)</option>
+                <option value="saakovska">🏛 Saakovska</option>
             </select>
 
             <input type="number" id="transfer-amount" placeholder="Сумма перевода">
