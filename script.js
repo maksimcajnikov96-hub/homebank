@@ -87,21 +87,6 @@ function startQRScanner() {
         let token = decodedText.trim().replace(/\s+/g, '');
         if (!token.startsWith("TX-")) { alert("❌ Неверный формат QR-кода!"); return; }
         
-        let parts = token.split("-");
-        let senderAccount = parts[2] ? parts[2].trim() : "";
-        let amountInCoins = parts[4] ? parseInt(parts[4]) : 0;
-        let encryptedReason = parts[5] ? parts[5].trim() : "";
-        
-        let user = bankDatabase.accounts[myAccountNumber];
-        let userBase = user ? (user.baseCurrency || "coins") : "coins";
-        let amountInUserCurrency = amountInCoins / RATES[userBase];
-        let decryptedReason = decodeDigitsToText(encryptedReason);
-
-        if (senderAccount === "DEBIT") {
-            let confirmPay = confirm(`⚠️ ОБНАРУЖЕН ШТРАФНОЙ ОРДЕР!\n\nСумма к оплате: ${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()}\nПричина: ${decryptedReason}\n\nВы действительно хотите оплатить этот штраф?`);
-            if (!confirmPay) { alert("Оплата штрафа отменена пользователем."); return; }
-        }
-
         document.getElementById('coupon-code-input').value = token;
         redeemSecureCode();
     };
@@ -160,7 +145,7 @@ async function loadBankData() {
     } catch (e) { console.log("Автономный режим"); }
 }
 
-// БЕЗОПАСНЫЙ ПУШ В ОБЛАКО (СЛИЯНИЕ ДАННЫХ ПЕРЕД ЗАПИСЬЮ)
+// БЕЗОПАСНЫЙ ПУШ В ОБЛАКО
 async function saveBankData() {
     let currentSessionClean = myAccountNumber.toString().trim().replace(/\s+/g, '');
     let localUserData = bankDatabase.accounts[currentSessionClean] ? JSON.parse(JSON.stringify(bankDatabase.accounts[currentSessionClean])) : null;
@@ -168,7 +153,6 @@ async function saveBankData() {
     let localMultiCodes = bankDatabase.multiCodes ? JSON.parse(JSON.stringify(bankDatabase.multiCodes)) : {};
 
     try {
-        // 1. Скачиваем самую свежую версию из облака прямо перед отправкой
         const response = await fetch(CLOUD_API_URL + "/latest", {
             method: "GET",
             headers: { "X-Master-Key": "$2b$10$P1W7p2S4v9zG1u.vA7vTeO6HwNf02Bq2V3sW9Xh7h1gXJ9yB7k8D6" }
@@ -178,13 +162,9 @@ async function saveBankData() {
             let cloudRes = await response.json();
             if (cloudRes.record && cloudRes.record.accounts) {
                 let cloudDatabase = cloudRes.record;
-
-                // 2. Интегрируем наши локальные изменения в свежую базу облака
                 if (localUserData) {
                     cloudDatabase.accounts[currentSessionClean] = localUserData;
                 }
-                
-                // Объединяем логи (чтобы новые строчки логов не затирали чужие)
                 let freshLogs = cloudDatabase.logs || [];
                 localLogs.forEach(localLog => {
                     if (!freshLogs.some(cloudLog => cloudLog.txId === localLog.txId)) {
@@ -192,20 +172,15 @@ async function saveBankData() {
                     }
                 });
                 cloudDatabase.logs = freshLogs;
-
-                // Объединяем многоразовые коды пулов
                 if (!cloudDatabase.multiCodes) cloudDatabase.multiCodes = {};
                 for (let codeId in localMultiCodes) {
                     cloudDatabase.multiCodes[codeId] = localMultiCodes[codeId];
                 }
-
-                // Переключаем рабочую базу на объединённую
                 bankDatabase = cloudDatabase;
             }
         }
-    } catch (e) { console.log("Ошибка слияния с облаком, сохраняем локально"); }
+    } catch (e) { console.log("Ошибка слияния"); }
 
-    // 3. Отправляем финальный объединённый вариант в облако
     safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
     try {
         await fetch(CLOUD_API_URL, {
@@ -219,7 +194,6 @@ async function saveBankData() {
     } catch (e) { console.log("Ошибка отправки сети"); }
 }
 
-// УМНАЯ СИНХРОНИЗАЦИЯ ПО КНОПКЕ ОБНОВЛЕНИЯ
 async function manualCloudRefresh() {
     await loadBankData();
     updateUI();
@@ -512,7 +486,14 @@ async function redeemSecureCode() {
     let amountInUserCurrency = amountInCoins / RATES[userBase];
 
     if (senderAccount !== "MULTI") {
-        if (receiverAccount !== currentSessionClean) { alert("🔒 Чек выписан на другое лицо."); return; }
+        // ИСПРАВЛЕННАЯ ПРОВЕРКА НАЗНАЧЕНИЯ ОРДЕРА
+        // Если это штраф (DEBIT), то нарушитель записан в receiverAccount (parts[3]).
+        // Если это обычный перевод, то получатель тоже записан в receiverAccount.
+        if (receiverAccount !== currentSessionClean) { 
+            alert("🔒 Ошибка! Этот код или ордер выписан на другой счет."); 
+            return; 
+        }
+        
         let activatedTokens = [];
         try { activatedTokens = JSON.parse(safeGetItem('usedHomeBankTokens') || "[]"); } catch(e){}
         if (activatedTokens.includes(txId)) { alert("Код уже активирован!"); return; }
@@ -520,7 +501,9 @@ async function redeemSecureCode() {
         if (senderAccount === "DEBIT") {
             user.balance -= amountInCoins;
             addTransactionToLog(txId, currentSessionClean, "00000000", amountInUserCurrency, `Штраф списан за: ${decryptedReason}`);
-            alert(`⚠️ Штраф успешно оплачен! Списано: ${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()}`);
+            
+            let finalAccountBalance = user.balance / RATES[userBase];
+            alert(`⚖️ Вам был выписан ордер на штраф!\n\n• Причина: ${decryptedReason}\n• Списано со счета: ${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()}\n\n💰 Ваш итоговый счет: ${finalAccountBalance.toFixed(2)} ${userBase.toUpperCase()}`);
         } else {
             user.balance += amountInCoins;
             addTransactionToLog(txId, senderAccount, currentSessionClean, amountInUserCurrency, `Зачислено: ${decryptedReason}`);
@@ -556,7 +539,6 @@ function addTransactionToLog(txId, fromUser, toUser, amount, statusDescription) 
     bankDatabase.logs.unshift(logItem);
 }
 
-// РЕГИСТРАЦИЯ НОВОГО СЧЕТА (С Балансом 0 и авто-входом)
 async function createAccount() {
     let name = document.getElementById('reg-name').value.trim();
     let cvv = document.getElementById('reg-custom-cvv').value.trim();
@@ -568,11 +550,10 @@ async function createAccount() {
     await loadBankData();
     let newNum = Math.floor(10000000 + Math.random() * 90000000).toString();
     
-    // Создаем аккаунт без стартового бонуса
     bankDatabase.accounts[newNum] = { 
         owner: name, 
         baseCurrency: selectedCur, 
-        balance: 0, // Баланс равен 0
+        balance: 0, 
         usd: 0, 
         eur: 0, 
         cny: 0, 
@@ -583,16 +564,13 @@ async function createAccount() {
         formattedNumber: newNum.substring(0,4) + " " + newNum.substring(4,8)
     };
     
-    // Сохраняем в облако
     await saveBankData();
     
-    // АВТОМАТИЧЕСКИЙ ВХОД СРАЗУ ПОСЛЕ РЕГИСТРАЦИИ
     safeSetItem('activeBankSession', newNum);
     myAccountNumber = newNum;
     
     alert("Счет успешно открыт! Номер вашего счета: " + newNum + "\n\nВы автоматически вошли в личный кабинет.");
     
-    // Прячем регистрацию, показываем кабинет и обновляем UI
     document.getElementById('register-zone').style.display = "none";
     document.getElementById('account-zone').style.display = "block";
     autoLogin(newNum);
