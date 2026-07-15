@@ -1,5 +1,5 @@
 const SUPABASE_URL = "https://dpuoekbyrvkauzmrzxmw.supabase.co";
-const SUPABASE_KEY = "ТВОЙ_ДЛИННЫЙ_ANON_PUBLIC_KEY"; // <-- ОБЯЗАТЕЛЬНО замени этот текст на свой длинный public anon ключ из Supabase!
+const SUPABASE_KEY = "ТВОЙ_ДЛИННЫЙ_ANON_PUBLIC_KEY"; // <-- Замени этот текст на твой длинный anon public ключ из настроек Supabase (Settings -> API)!
 
 const RATES = {
     coins: 1.00,
@@ -126,7 +126,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 async function loginAccount() {
     let rawNumber = document.getElementById('login-number').value;
-    // Очищаем любые пробелы: "7777 7777" превратится в "77777777"
     let numberInput = rawNumber.trim().replace(/\s+/g, '');
     let cvvInput = document.getElementById('login-cvv').value.trim().replace(/\s+/g, '');
     
@@ -200,7 +199,6 @@ function logout() {
     myAccountNumber = ""; userAccountData = null;
     document.getElementById('account-zone').style.display = "none";
     document.getElementById('login-zone').style.display = "block";
-    // Очищаем инпуты входа
     document.getElementById('login-number').value = "";
     document.getElementById('login-cvv').value = "";
 }
