@@ -1,5 +1,5 @@
 const SUPABASE_URL = "https://dpuoekbyrvkauzmrzxmw.supabase.co";
-const SUPABASE_KEY = "ТВОЙ_ДЛИННЫЙ_ANON_PUBLIC_KEY"; // <-- СЮДА ВСТАВЬ СВОЙ КЛЮЧ ИЗ SUPABASE!
+const SUPABASE_KEY = "ТВОЙ_ДЛИННЫЙ_ANON_PUBLIC_KEY"; // <-- ОБЯЗАТЕЛЬНО замени этот текст на свой длинный public anon ключ из Supabase!
 
 const RATES = {
     coins: 1.00,
@@ -25,8 +25,14 @@ let userAccountData = null;
 let myAccountNumber = "";
 let html5QrScanner = null;
 
-// Функция для безопасных быстрых запросов к Supabase
+// Универсальная функция запросов к Supabase с детальным логированием ошибок
 async function supabaseFetch(endpoint, method = "GET", body = null) {
+    if (!SUPABASE_KEY || SUPABASE_KEY === "ТВОЙ_ДЛИННЫЙ_ANON_PUBLIC_KEY") {
+        console.error("Критическая ошибка: Не указан SUPABASE_KEY в коде script.js!");
+        alert("⚠️ Настройка банка не завершена: отсутствует ключ API базы данных.");
+        return null;
+    }
+
     const headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": `Bearer ${SUPABASE_KEY}`,
@@ -38,10 +44,14 @@ async function supabaseFetch(endpoint, method = "GET", body = null) {
     
     try {
         const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, config);
-        if (!response.ok) throw new Error(await response.text());
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error(`Ошибка Supabase REST (${endpoint}):`, errText);
+            return null;
+        }
         return await response.json();
     } catch (e) {
-        console.error("Ошибка сети Supabase:", e);
+        console.error("Сбой сетевого запроса к Supabase:", e);
         return null;
     }
 }
@@ -115,12 +125,25 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loginAccount() {
-    let numberInput = document.getElementById('login-number').value.trim().replace(/\s+/g, '');
+    let rawNumber = document.getElementById('login-number').value;
+    // Очищаем любые пробелы: "7777 7777" превратится в "77777777"
+    let numberInput = rawNumber.trim().replace(/\s+/g, '');
     let cvvInput = document.getElementById('login-cvv').value.trim().replace(/\s+/g, '');
     
+    if (!numberInput || !cvvInput) {
+        alert("Заполните все поля для авторизации!");
+        return;
+    }
+
     const res = await supabaseFetch(`accounts?number=eq.${numberInput}`, "GET");
-    if (!res || res.length === 0 || res[0].cvv !== cvvInput) {
-        alert("Неверные данные счета или CVV!"); return;
+    if (!res || res.length === 0) {
+        alert("Счет не найден в базе! Проверьте номер счета или API-ключ Supabase.");
+        return;
+    }
+    
+    if (res[0].cvv !== cvvInput) {
+        alert("Неверный CVV безопасности!");
+        return;
     }
     
     userAccountData = res[0];
@@ -177,6 +200,9 @@ function logout() {
     myAccountNumber = ""; userAccountData = null;
     document.getElementById('account-zone').style.display = "none";
     document.getElementById('login-zone').style.display = "block";
+    // Очищаем инпуты входа
+    document.getElementById('login-number').value = "";
+    document.getElementById('login-cvv').value = "";
 }
 
 function updateExchangePreview() {
@@ -224,7 +250,6 @@ async function executeCurrencyExchange() {
     const amount = parseFloat(document.getElementById('exchange-input-amount').value);
     if (isNaN(amount) || amount <= 0) return alert("Укажите сумму!");
 
-    // Подгружаем свежие данные с сервера, чтобы избежать дюпа
     const fresh = await supabaseFetch(`accounts?number=eq.${myAccountNumber}`, "GET");
     if(fresh) userAccountData = fresh[0];
 
@@ -277,14 +302,12 @@ async function transferMoney() {
     if (isNaN(amountInSelectedCurrency) || amountInSelectedCurrency <= 0) return alert("Укажите сумму!");
     if (targetNumber === myAccountNumber && myAccountNumber !== "77777777") return alert("Нельзя переводить самому себе!");
 
-    // Свежий баланс отправителя
     const freshSender = await supabaseFetch(`accounts?number=eq.${myAccountNumber}`, "GET");
     if(freshSender) userAccountData = freshSender[0];
 
     let amountInCoins = myAccountNumber === "77777777" ? 0 : amountInSelectedCurrency * RATES[selectedCurrency];
     if (myAccountNumber !== "77777777" && amountInCoins > userAccountData.balance) return alert("Недостаточно средств на балансе!");
 
-    // Снимаем деньги с отправителя
     if (myAccountNumber !== "77777777") {
         await supabaseFetch(`accounts?number=eq.${myAccountNumber}`, "PATCH", { balance: userAccountData.balance - amountInCoins });
     }
@@ -313,7 +336,6 @@ async function createAdminDebitCode() {
 
     if (isNaN(amountInAdminCurrency) || amountInAdminCurrency <= 0) return alert("Укажите сумму штрафа!");
 
-    // Проверяем, существует ли аккаунт нарушителя
     const targetCheck = await supabaseFetch(`accounts?number=eq.${targetNumber}`, "GET");
     if (!targetCheck || targetCheck.length === 0) return alert(`🚫 Нарушитель со счетом № ${targetNumber} не найден в базе!`);
 
@@ -486,7 +508,6 @@ async function createAccount() {
     if (!name || !cvv) return alert("Заполните все поля!");
     if (cvv.length < 3 || cvv.length > 4) return alert("CVV должен состоять из 3-4 цифр!");
 
-    // Проверка имени по серверной базе
     const nameCheck = await supabaseFetch(`accounts?owner=ilike.${name}`, "GET");
     if (nameCheck && nameCheck.length > 0) return alert(`🚫 Ошибка! Владелец с именем "${name}" уже зарегистрирован.`);
 
