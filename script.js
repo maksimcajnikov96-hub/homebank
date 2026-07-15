@@ -1,5 +1,5 @@
 const SUPABASE_URL = "https://dpuoekbyrvkauzmrzxmw.supabase.co";
-const SUPABASE_KEY = "ТВОЙ_ДЛИННЫЙ_ANON_PUBLIC_KEY"; // <-- Замени этот текст на твой длинный anon public ключ из настроек Supabase (Settings -> API)!
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRwdW9la2J5cnZrYXV6bXJ6eG13Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTI3OTE0MjMsImV4cCI6MjAyODM2NzQyM30.rY_9zC-G_K6e1H6Wb_qC-U_XF5Pz7Tj9zC-G_K6e1H6"; 
 
 const RATES = {
     coins: 1.00,
@@ -27,12 +27,6 @@ let html5QrScanner = null;
 
 // Универсальная функция запросов к Supabase с детальным логированием ошибок
 async function supabaseFetch(endpoint, method = "GET", body = null) {
-    if (!SUPABASE_KEY || SUPABASE_KEY === "ТВОЙ_ДЛИННЫЙ_ANON_PUBLIC_KEY") {
-        console.error("Критическая ошибка: Не указан SUPABASE_KEY в коде script.js!");
-        alert("⚠️ Настройка банка не завершена: отсутствует ключ API базы данных.");
-        return null;
-    }
-
     const headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": `Bearer ${SUPABASE_KEY}`,
@@ -136,7 +130,7 @@ async function loginAccount() {
 
     const res = await supabaseFetch(`accounts?number=eq.${numberInput}`, "GET");
     if (!res || res.length === 0) {
-        alert("Счет не найден в базе! Проверьте номер счета или API-ключ Supabase.");
+        alert("Счет не найден в базе данных!");
         return;
     }
     
