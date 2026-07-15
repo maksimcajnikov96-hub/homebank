@@ -44,7 +44,7 @@ function safeSetItem(key, value) {
     try { localStorage.setItem(key, value); } catch (e) {}
 }
 
-// ID транзакции
+// Генератор уникального ID транзакции
 function generateUniqueTxId() {
     return Math.random().toString(36).substring(2, 9).toUpperCase();
 }
@@ -620,12 +620,11 @@ function addTransactionToLog(txId, fromUser, toUser, amount, statusDescription) 
     bankDatabase.logs.unshift(logItem);
 }
 
-// РЕГИСТРАЦИЯ НОВОГО СЧЕТА (С Жестким ограничением на 1 аккаунт)
+// РЕГИСТРАЦИЯ С ОГРАНИЧЕНИЕМ НА 1 АКК
 async function createAccount() {
-    // 1. Проверяем локальный отпечаток устройства в браузере
     let deviceFingerprint = safeGetItem('myRegisteredBankNumber');
     if (deviceFingerprint) {
-        alert(`🚫 Отказано в регистрации!\n\nНа этом устройстве уже создан один расчетный счет № ${deviceFingerprint}. Создание мульти-аккаунтов запрещено.`);
+        alert(`🚫 Отказано в регистрации!\n\nНа этом устройстве уже создан расчетный счет № ${deviceFingerprint}.`);
         switchZone('login');
         return;
     }
@@ -639,10 +638,9 @@ async function createAccount() {
 
     await loadBankData();
 
-    // 2. Проверяем по облачной базе данных, чтобы имя владельца не повторялось (если очистили кэш)
     for (let acc in bankDatabase.accounts) {
         if (bankDatabase.accounts[acc].owner.toLowerCase() === name.toLowerCase()) {
-            alert(`🚫 Ошибка! Владелец с именем "${name}" уже имеет расчетный счет в банке. Повторное создание запрещено.`);
+            alert(`🚫 Ошибка! Владелец с именем "${name}" уже имеет расчетный счет.`);
             return;
         }
     }
@@ -662,9 +660,7 @@ async function createAccount() {
     
     await saveBankData();
     
-    // 3. Намертво привязываем номер созданного аккаунта к памяти этого устройства
     safeSetItem('myRegisteredBankNumber', newNum);
-    
     safeSetItem('activeBankSession', newNum);
     myAccountNumber = newNum;
     
@@ -677,10 +673,9 @@ async function createAccount() {
 
 function switchZone(zone) {
     if (zone === 'register') {
-        // Дополнительная проверка при клике на кнопку перехода к регистрации
         let deviceFingerprint = safeGetItem('myRegisteredBankNumber');
         if (deviceFingerprint) {
-            alert(`🚫 Доступ заблокирован!\n\nНа этом устройстве уже зарегистрирован аккаунт № ${deviceFingerprint}. Вы не можете открыть второй счет.`);
+            alert(`🚫 Доступ заблокирован!\n\nНа этом устройстве уже зарегистрирован аккаунт № ${deviceFingerprint}.`);
             return;
         }
         let generatedNum = Math.floor(10000000 + Math.random() * 90000000).toString();
