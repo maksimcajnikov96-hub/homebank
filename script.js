@@ -28,8 +28,8 @@ let html5QrScanner = null;
 function getDefaultData() {
     return {
         accounts: {
-            "77777777": { owner: "Управление Банка (Казна) 👑", baseCurrency: "coins", balance: 500000, usd: 10000, eur: 5000, cny: 50000, ton: 5000, btc: 5, saakovska: 100, cvv: "8354", formattedNumber: "7777 7777" },
-            "21535477": { owner: "Центральный расчетный счет", baseCurrency: "coins", balance: 1000, usd: 0, eur: 0, cny: 0, ton: 0, btc: 0, saakovska: 0, cvv: "111", formattedNumber: "2153 5477" }
+            "77777777": { owner: "Управление Банка (Казна) 👑", baseCurrency: "coins", balance: 500000, usd: 10000, eur: 5000, cny: 50000, ton: 5000, btc: 5, saakovska: 100, cvv: "8354", formattedNumber: "7777 7777", isArrested: false, arrestReason: "" },
+            "21535477": { owner: "Центральный расчетный счет", baseCurrency: "coins", balance: 1000, usd: 0, eur: 0, cny: 0, ton: 0, btc: 0, saakovska: 0, cvv: "111", formattedNumber: "2153 5477", isArrested: false, arrestReason: "" }
         },
         logs: [],
         multiCodes: {}
@@ -42,6 +42,11 @@ function safeGetItem(key) {
 
 function safeSetItem(key, value) {
     try { localStorage.setItem(key, value); } catch (e) {}
+}
+
+// ID транзакции
+function generateUniqueTxId() {
+    return Math.random().toString(36).substring(2, 9).toUpperCase();
 }
 
 function encodeTextToDigits(text) {
@@ -68,15 +73,20 @@ function decodeDigitsToText(digits) {
 
 function generateQR(containerId, text) {
     const container = document.getElementById(containerId);
+    if (!container) return;
     container.innerHTML = ""; 
-    new QRCode(container, {
-        text: text,
-        width: 160,
-        height: 160,
-        colorDark : "#111827",
-        colorLight : "#fff8db",
-        correctLevel : QRCode.CorrectLevel.H
-    });
+    try {
+        new QRCode(container, {
+            text: text,
+            width: 160,
+            height: 160,
+            colorDark : "#111827",
+            colorLight : "#fff8db",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+    } catch (e) {
+        console.error("Ошибка генерации QR-кода:", e);
+    }
 }
 
 function startQRScanner() {
@@ -138,6 +148,8 @@ async function loadBankData() {
                     if (a.ton === undefined) a.ton = 0;
                     if (a.btc === undefined) a.btc = 0;
                     if (a.saakovska === undefined) a.saakovska = 0;
+                    if (a.isArrested === undefined) a.isArrested = false;
+                    if (a.arrestReason === undefined) a.arrestReason = "";
                 }
                 safeSetItem('homeBankGlobalData', JSON.stringify(bankDatabase));
             }
@@ -252,6 +264,13 @@ function autoLogin(accountNumber) {
 
 async function changeUserCurrency() {
     let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let user = bankDatabase.accounts[myCleanNumber];
+    
+    if (user.isArrested) {
+        alert("🔒 Операция заблокирована! Ваше имущество арестовано.");
+        return;
+    }
+
     let newCurrency = document.getElementById('user-change-currency').value;
     await loadBankData();
     if (bankDatabase.accounts[myCleanNumber]) {
@@ -312,13 +331,20 @@ function updateExchangePreview() {
 }
 
 async function executeCurrencyExchange() {
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let user = bankDatabase.accounts[myCleanNumber];
+
+    if (user.isArrested) {
+        alert("🔒 Операция заблокирована! Ваше имущество арестовано.");
+        return;
+    }
+
     const direction = document.getElementById('exchange-direction').value;
     const amount = parseFloat(document.getElementById('exchange-input-amount').value);
     if (isNaN(amount) || amount <= 0) { alert("Укажите сумму!"); return; }
     
     await loadBankData();
-    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
-    let user = bankDatabase.accounts[myCleanNumber];
+    user = bankDatabase.accounts[myCleanNumber];
     
     if (myCleanNumber !== "77777777") {
         if (direction.startsWith("coins_") && user.balance < amount) { alert("Недостаточно монет!"); return; }
@@ -344,7 +370,7 @@ async function executeCurrencyExchange() {
     else if (direction === "coins_to_saakovska") { user.balance -= amount; user.saakovska = (user.saakovska || 0) + (amount / RATES.saakovska); logMsg = `Обмен: ${amount} 🪙 -> ${(amount / RATES.saakovska).toFixed(4)} SAK`; }
     else if (direction === "saakovska_to_coins") { user.saakovska -= amount; user.balance += (amount * RATES.saakovska); logMsg = `Обмен: ${amount} SAK -> ${(amount * RATES.saakovska).toFixed(2)} 🪙`; }
     
-    let txId = Math.floor(1000 + Math.random() * 9000);
+    let txId = generateUniqueTxId();
     addTransactionToLog(txId, myCleanNumber, "EXCHANGE", amount, logMsg);
     await saveBankData();
     updateUI();
@@ -354,6 +380,14 @@ async function executeCurrencyExchange() {
 }
 
 async function transferMoney() {
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let sender = bankDatabase.accounts[myCleanNumber];
+
+    if (sender.isArrested) {
+        alert("🔒 Операция заблокирована! Ваше имущество арестовано.");
+        return;
+    }
+
     let targetNumber = document.getElementById('target-account-number').value.trim().replace(/\s+/g, '');
     const amountInput = document.getElementById('transfer-amount');
     const reasonInput = document.getElementById('transfer-reason');
@@ -363,8 +397,7 @@ async function transferMoney() {
     
     if (isNaN(amountInSelectedCurrency) || amountInSelectedCurrency <= 0) { alert("Укажите сумму!"); return; }
     await loadBankData(); 
-    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
-    let sender = bankDatabase.accounts[myCleanNumber];
+    sender = bankDatabase.accounts[myCleanNumber];
     
     let amountInCoins = myCleanNumber === "77777777" ? 0 : amountInSelectedCurrency * RATES[selectedCurrency];
     if (targetNumber === myCleanNumber && myCleanNumber !== "77777777") { alert("Нельзя переводить самому себе!"); return; }
@@ -374,7 +407,7 @@ async function transferMoney() {
     if (myCleanNumber !== "77777777") { sender.balance -= amountInCoins; }
     
     let finalCoinsAmount = amountInSelectedCurrency * RATES[selectedCurrency];
-    let txId = Math.floor(1000 + Math.random() * 9000);
+    let txId = generateUniqueTxId();
     let cryptedReason = encodeTextToDigits(reason);
     
     let secureToken = `TX-${txId}-${myCleanNumber}-${targetNumber}-${Math.floor(finalCoinsAmount)}-${cryptedReason}`;
@@ -406,7 +439,7 @@ async function createAdminDebitCode() {
     let amountInCoins = amountInAdminCurrency * RATES[adminBase];
     if (reason === "") { reason = "Штраф"; }
     
-    let txId = Math.floor(1000 + Math.random() * 9000);
+    let txId = generateUniqueTxId();
     let cryptedReason = encodeTextToDigits(reason);
     
     let secureToken = `TX-${txId}-DEBIT-${targetNumber}-${Math.floor(amountInCoins)}-${cryptedReason}`;
@@ -421,7 +454,54 @@ async function createAdminDebitCode() {
     amountInput.value = ""; reasonInput.value = ""; document.getElementById('admin-target-account').value = "";
 }
 
+async function arrestAccount() {
+    let target = document.getElementById('admin-arrest-account').value.trim().replace(/\s+/g, '');
+    let reason = document.getElementById('admin-arrest-reason').value.trim();
+    
+    if (!target || !reason) { alert("Заполните номер счета и причину ареста!"); return; }
+    await loadBankData();
+    if (!bankDatabase.accounts[target]) { alert("Счет не найден!"); return; }
+    
+    bankDatabase.accounts[target].isArrested = true;
+    bankDatabase.accounts[target].arrestReason = reason;
+    
+    let txId = generateUniqueTxId();
+    addTransactionToLog(txId, "77777777", target, 0, `Арест имущества: ${reason}`);
+    
+    await saveBankData();
+    alert(`🔒 Имущество счета ${target} успешно арестовано!`);
+    document.getElementById('admin-arrest-account').value = "";
+    document.getElementById('admin-arrest-reason').value = "";
+    updateUI();
+}
+
+async function unarrestAccount() {
+    let target = document.getElementById('admin-arrest-account').value.trim().replace(/\s+/g, '');
+    if (!target) { alert("Укажите номер счета для снятия ареста!"); return; }
+    await loadBankData();
+    if (!bankDatabase.accounts[target]) { alert("Счет не найден!"); return; }
+    
+    bankDatabase.accounts[target].isArrested = false;
+    bankDatabase.accounts[target].arrestReason = "";
+    
+    let txId = generateUniqueTxId();
+    addTransactionToLog(txId, "77777777", target, 0, `Арест имущества снят`);
+    
+    await saveBankData();
+    alert(`🔓 Арест со счета ${target} успешно снят!`);
+    document.getElementById('admin-arrest-account').value = "";
+    updateUI();
+}
+
 async function createMultiSplitCode() {
+    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
+    let user = bankDatabase.accounts[myCleanNumber];
+
+    if (user.isArrested) {
+        alert("🔒 Операция заблокирована! Ваше имущество арестовано.");
+        return;
+    }
+
     const poolInput = document.getElementById('multi-total-pool');
     const limitInput = document.getElementById('multi-activations-limit');
     const reasonInput = document.getElementById('multi-custom-reason');
@@ -433,8 +513,7 @@ async function createMultiSplitCode() {
     if (isNaN(limit) || limit <= 0) { alert("Укажите лимит!"); return; }
     
     await loadBankData();
-    let myCleanNumber = myAccountNumber.toString().trim().replace(/\s+/g, '');
-    let user = bankDatabase.accounts[myCleanNumber];
+    user = bankDatabase.accounts[myCleanNumber];
     let userBase = user.baseCurrency || "coins";
     
     let totalPoolInCoins = totalPoolInUserCurrency * RATES[userBase];
@@ -445,7 +524,7 @@ async function createMultiSplitCode() {
     if (reason === "") { reason = "Конверт с монетами"; }
     if (myCleanNumber !== "77777777") { user.balance -= totalPoolInCoins; }
     
-    let txId = Math.floor(1000 + Math.random() * 9000);
+    let txId = generateUniqueTxId();
     let cryptedReason = encodeTextToDigits(reason);
     
     let secureToken = `TX-${txId}-MULTI-${limit}-${amountPerActivationInCoins}-${cryptedReason}`;
@@ -481,14 +560,16 @@ async function redeemSecureCode() {
     let currentSessionClean = myAccountNumber.toString().trim().replace(/\s+/g, '');
     let user = bankDatabase.accounts[currentSessionClean];
     let userBase = user.baseCurrency || "coins";
+
+    if (user.isArrested) {
+        alert("🔒 Операция заблокирована! Ваше имущество арестовано.");
+        return;
+    }
     
     let decryptedReason = decodeDigitsToText(encryptedReason);
     let amountInUserCurrency = amountInCoins / RATES[userBase];
 
     if (senderAccount !== "MULTI") {
-        // ИСПРАВЛЕННАЯ ПРОВЕРКА НАЗНАЧЕНИЯ ОРДЕРА
-        // Если это штраф (DEBIT), то нарушитель записан в receiverAccount (parts[3]).
-        // Если это обычный перевод, то получатель тоже записан в receiverAccount.
         if (receiverAccount !== currentSessionClean) { 
             alert("🔒 Ошибка! Этот код или ордер выписан на другой счет."); 
             return; 
@@ -539,7 +620,16 @@ function addTransactionToLog(txId, fromUser, toUser, amount, statusDescription) 
     bankDatabase.logs.unshift(logItem);
 }
 
+// РЕГИСТРАЦИЯ НОВОГО СЧЕТА (С Жестким ограничением на 1 аккаунт)
 async function createAccount() {
+    // 1. Проверяем локальный отпечаток устройства в браузере
+    let deviceFingerprint = safeGetItem('myRegisteredBankNumber');
+    if (deviceFingerprint) {
+        alert(`🚫 Отказано в регистрации!\n\nНа этом устройстве уже создан один расчетный счет № ${deviceFingerprint}. Создание мульти-аккаунтов запрещено.`);
+        switchZone('login');
+        return;
+    }
+
     let name = document.getElementById('reg-name').value.trim();
     let cvv = document.getElementById('reg-custom-cvv').value.trim();
     let selectedCur = document.getElementById('reg-base-currency').value;
@@ -548,23 +638,32 @@ async function createAccount() {
     if (cvv.length < 3 || cvv.length > 4) return alert("CVV должен состоять из 3-4 цифр!");
 
     await loadBankData();
+
+    // 2. Проверяем по облачной базе данных, чтобы имя владельца не повторялось (если очистили кэш)
+    for (let acc in bankDatabase.accounts) {
+        if (bankDatabase.accounts[acc].owner.toLowerCase() === name.toLowerCase()) {
+            alert(`🚫 Ошибка! Владелец с именем "${name}" уже имеет расчетный счет в банке. Повторное создание запрещено.`);
+            return;
+        }
+    }
+
     let newNum = Math.floor(10000000 + Math.random() * 90000000).toString();
     
     bankDatabase.accounts[newNum] = { 
         owner: name, 
         baseCurrency: selectedCur, 
         balance: 0, 
-        usd: 0, 
-        eur: 0, 
-        cny: 0, 
-        ton: 0, 
-        btc: 0,
-        saakovska: 0,
+        usd: 0, eur: 0, cny: 0, ton: 0, btc: 0, saakovska: 0,
         cvv: cvv, 
-        formattedNumber: newNum.substring(0,4) + " " + newNum.substring(4,8)
+        formattedNumber: newNum.substring(0,4) + " " + newNum.substring(4,8),
+        isArrested: false,
+        arrestReason: ""
     };
     
     await saveBankData();
+    
+    // 3. Намертво привязываем номер созданного аккаунта к памяти этого устройства
+    safeSetItem('myRegisteredBankNumber', newNum);
     
     safeSetItem('activeBankSession', newNum);
     myAccountNumber = newNum;
@@ -578,6 +677,12 @@ async function createAccount() {
 
 function switchZone(zone) {
     if (zone === 'register') {
+        // Дополнительная проверка при клике на кнопку перехода к регистрации
+        let deviceFingerprint = safeGetItem('myRegisteredBankNumber');
+        if (deviceFingerprint) {
+            alert(`🚫 Доступ заблокирован!\n\nНа этом устройстве уже зарегистрирован аккаунт № ${deviceFingerprint}. Вы не можете открыть второй счет.`);
+            return;
+        }
         let generatedNum = Math.floor(10000000 + Math.random() * 90000000).toString();
         document.getElementById('reg-generated-number').innerText = generatedNum.substring(0,4) + " " + generatedNum.substring(4,8);
         document.getElementById('login-zone').style.display = "none";
@@ -602,6 +707,22 @@ function updateUI() {
         document.getElementById('balance-ton').innerText = (user.ton || 0).toFixed(2);
         document.getElementById('balance-btc').innerText = (user.btc || 0).toFixed(5);
         document.getElementById('balance-saakovska').innerText = (user.saakovska || 0).toFixed(4);
+
+        const arrestBanner = document.getElementById('arrest-banner');
+        const arrestText = document.getElementById('arrest-banner-text');
+        const bankingActions = document.getElementById('banking-active-actions');
+        const currencyChangeSection = document.getElementById('currency-change-section');
+
+        if (user.isArrested) {
+            arrestText.innerText = `Ваше имущество арестовано, причиной стало это: ${user.arrestReason}`;
+            arrestBanner.style.display = "block";
+            bankingActions.style.display = "none"; 
+            currencyChangeSection.style.display = "none"; 
+        } else {
+            arrestBanner.style.display = "none";
+            bankingActions.style.display = "block";
+            currencyChangeSection.style.display = "block";
+        }
     }
     
     let container = document.getElementById('history-list-container');
@@ -613,19 +734,19 @@ function updateUI() {
     
     logs.forEach(log => {
         if (myCleanNumber === "77777777" || log.from === myCleanNumber || log.to === myCleanNumber) {
-            if (searchQuery !== "" && !log.txId.includes(searchQuery)) { return; }
+            if (searchQuery !== "" && !log.txId.toLowerCase().includes(searchQuery.toLowerCase())) { return; }
             hasLogs = true;
             let item = document.createElement('div');
             item.className = "history-item";
             let nameFrom = bankDatabase.accounts[log.from] ? bankDatabase.accounts[log.from].owner : log.from;
             let nameTo = bankDatabase.accounts[log.to] ? bankDatabase.accounts[log.to].owner : log.to;
-            let isDebitTx = log.status.includes('Штраф') || log.status.includes('ордер') || log.status.includes('списан');
+            let isDebitTx = log.status.includes('Штраф') || log.status.includes('ордер') || log.status.includes('списан') || log.status.includes('Арест') || log.status.includes('арестовано');
             let isExchange = log.to === "EXCHANGE";
             let color = "#10b981"; if (isDebitTx) color = "#ef4444"; if (isExchange) color = "#3b82f6";
             
             item.innerHTML = `
                 [${log.time}] <span class="tx-id">Транзакция: #${log.txId}</span><br>
-                ${isExchange ? `Действие: <b>${log.status}</b>` : `Отправитель: <b>${nameFrom}</b> -> Получатель: <b>${nameTo}</b><br>Параметры: <b style="color:${color};">${log.amount} ед.</b> | Статус: <i>${log.status}</i>`}
+                ${isExchange ? `Действие: <b>${log.status}</b>` : `Отправитель: <b>${nameFrom}</b> -> Получатель: <b>${nameTo}</b><br>Параметры: <b style="color:${color};">${log.amount} ед.</b> | Status: <i>${log.status}</i>`}
             `;
             container.appendChild(item);
         }
