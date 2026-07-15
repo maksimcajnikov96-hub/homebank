@@ -44,7 +44,7 @@ function safeSetItem(key, value) {
     try { localStorage.setItem(key, value); } catch (e) {}
 }
 
-// Генератор уникального ID транзакции
+// Генератор уникального буквенно-цифрового ID транзакции для стабильной записи
 function generateUniqueTxId() {
     return Math.random().toString(36).substring(2, 9).toUpperCase();
 }
@@ -303,7 +303,7 @@ function updateExchangePreview() {
     let showName = baseCurr.toUpperCase();
     
     ratesBox.innerHTML = `
-        📊 <b>Рыночные котировки в вашей валюте (${showName}):</b><br>
+        📊 <b>Рыночные котировки в твоей валюте (${showName}):</b><br>
         • 1 🪙 Монетка = ${(1 / userRate).toFixed(4)} ${showName}<br>
         • 1 💵 Доллар (USD) = ${(RATES.usd / userRate).toFixed(2)} ${showName}<br>
         • 1 💶 Евро (EUR) = ${(RATES.eur / userRate).toFixed(2)} ${showName}<br>
@@ -454,13 +454,14 @@ async function createAdminDebitCode() {
     amountInput.value = ""; reasonInput.value = ""; document.getElementById('admin-target-account').value = "";
 }
 
+// ИСПРАВЛЕННЫЙ АРЕСТ (Авто-очистка любых пробелов из формы)
 async function arrestAccount() {
     let target = document.getElementById('admin-arrest-account').value.trim().replace(/\s+/g, '');
     let reason = document.getElementById('admin-arrest-reason').value.trim();
     
     if (!target || !reason) { alert("Заполните номер счета и причину ареста!"); return; }
     await loadBankData();
-    if (!bankDatabase.accounts[target]) { alert("Счет не найден!"); return; }
+    if (!bankDatabase.accounts[target]) { alert(`Счет № ${target} не найден в базе данных банка!`); return; }
     
     bankDatabase.accounts[target].isArrested = true;
     bankDatabase.accounts[target].arrestReason = reason;
@@ -475,11 +476,12 @@ async function arrestAccount() {
     updateUI();
 }
 
+// ИСПРАВЛЕННОЕ СНЯТИЕ АРЕСТА (Авто-очистка пробелов)
 async function unarrestAccount() {
     let target = document.getElementById('admin-arrest-account').value.trim().replace(/\s+/g, '');
     if (!target) { alert("Укажите номер счета для снятия ареста!"); return; }
     await loadBankData();
-    if (!bankDatabase.accounts[target]) { alert("Счет не найден!"); return; }
+    if (!bankDatabase.accounts[target]) { alert(`Счет № ${target} не найден в базе данных банка!`); return; }
     
     bankDatabase.accounts[target].isArrested = false;
     bankDatabase.accounts[target].arrestReason = "";
@@ -584,7 +586,7 @@ async function redeemSecureCode() {
             addTransactionToLog(txId, currentSessionClean, "00000000", amountInUserCurrency, `Штраф списан за: ${decryptedReason}`);
             
             let finalAccountBalance = user.balance / RATES[userBase];
-            alert(`⚖️ Вам был выписан ордер на штраф!\n\n• Причина: ${decryptedReason}\n• Списано со счета: ${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()}\n\n💰 Ваш итоговый счет: ${finalAccountBalance.toFixed(2)} ${userBase.toUpperCase()}`);
+            alert(`⚖️ Вам был выписан ордер на штраф!\n\n• Причина: ${decryptedReason}\n• Списано со счета: ${amountInUserCurrency.toFixed(2)} ${userBase.toUpperCase()}\n\n💰 Твой итоговый счет: ${finalAccountBalance.toFixed(2)} ${userBase.toUpperCase()}`);
         } else {
             user.balance += amountInCoins;
             addTransactionToLog(txId, senderAccount, currentSessionClean, amountInUserCurrency, `Зачислено: ${decryptedReason}`);
@@ -620,11 +622,11 @@ function addTransactionToLog(txId, fromUser, toUser, amount, statusDescription) 
     bankDatabase.logs.unshift(logItem);
 }
 
-// РЕГИСТРАЦИЯ С ОГРАНИЧЕНИЕМ НА 1 АКК
+// СТАБИЛЬНАЯ РЕГИСТРАЦИЯ С ОГРАНИЧЕНИЕМ НА 1 АККАУНТ И АВТО-ВХОДОМ
 async function createAccount() {
     let deviceFingerprint = safeGetItem('myRegisteredBankNumber');
     if (deviceFingerprint) {
-        alert(`🚫 Отказано в регистрации!\n\nНа этом устройстве уже создан расчетный счет № ${deviceFingerprint}.`);
+        alert(`🚫 Отказано в регистрации!\n\nНа этом устройстве уже создан расчетный счет № ${deviceFingerprint}. Создание мульти-аккаунтов запрещено.`);
         switchZone('login');
         return;
     }
@@ -660,6 +662,7 @@ async function createAccount() {
     
     await saveBankData();
     
+    // Привязываем аккаунт к устройству намертво
     safeSetItem('myRegisteredBankNumber', newNum);
     safeSetItem('activeBankSession', newNum);
     myAccountNumber = newNum;
